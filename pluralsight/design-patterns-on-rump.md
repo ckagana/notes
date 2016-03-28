@@ -1,3 +1,5 @@
+# Design patterns on rump
+
 Design patterns come from the realization that many times we face the same kinds of problems over and over again, like the following:
 - getting notification when a process completes or a state changes
 - making a complex API easier to work with, so that clients don't need to deal with the inner implementation details
@@ -11,7 +13,7 @@ Design patterns, thus, don't give us the specific implementation of a solution, 
 
 Many SDKs provide implementations of common design patterns in their libraries. However, often these implementations don't just fit our needs very well: in those cases, we need to come out with different implementations of the same design patterns.
 
-### Observer pattern
+## Observer pattern
 This pattern describes publish/subscribe relationships. The publisher, also known as the *subject*, is the object that we want to watch for a state change. Subscribers are the observers, and they are notified when the subject changes its state. For instance, this is the behaviour of the follow button on twitter.
 
 In the .Net framework, event handlers are implementations of the observer pattern:
@@ -44,7 +46,7 @@ public partial class MainWindow: Window
 }
 ```
 
-#### Consequences of the Observer pattern
+### Consequences of the Observer pattern
 Since the notification from the subject may never come (because the state we are monitoring may happen to never change), observers should always be properly initialized, and they should never rely on getting a notification.
 
 We may get repeated notifications, so observers should be prepared to deal with duplicated notifications. For instance, the observer may start a long process in reaction to the first notification: thus, the second, duplicated, notification may come when the process kicked off by the first one, is still running. The problem here is that we may need to start the process again, or to check if the state change is really relevant.
@@ -53,7 +55,7 @@ In certain circumstances, notifications can come very quickly, like hundreds or 
 
 Sicne the subject keeps a reference of every subscriber, after one subscriber is no longer used, it can't be disposed by the garbage collector, because a reference to it is still held by the subject (which tipically outlives observers).
 
-### Event aggregators
+## Event aggregators
 Event aggregators are designed to work along with publishers and subscribers that don't know anything about each other. A subscriber would subscribe to an event, and the publisher would publish that event.
 
 ```c#
