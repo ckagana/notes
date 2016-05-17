@@ -80,7 +80,7 @@ namespace AdapterDemo.Model
 }
 ```
 
-And we need to be able to render that pattern. Somewhere in our application we already have code that is requiring this interface that expects to be able to call `PatternRenderer` and get back a string when it says `ListPatterns`. We want this to give us back some kind of tabular representation of our patterns, very similar to what the `DataRenderer` does given a `DataAdapter`. But `DataRenderer.Render` is a `void` that expects a `TextWriter`, and our `PatternRenderer` is a `string` that expects a collection of patterns. So the code to rendere our data in a tabular fashion exists in our `DataRenderer`, we don't have easy access to it, because it doesn't have the correct interface that we expect.
+And we need to be able to render that pattern. Somewhere in our application we already have code that is requiring this interface that expects to be able to call `PatternRenderer` and get back a string when it says `ListPatterns`. We want this to give us back some kind of tabular representation of our patterns, very similar to what the `DataRenderer` does given a `DataAdapter`. But `DataRenderer.Render` is a `void` that expects a `TextWriter`, and our `PatternRenderer` is a `string` that expects a collection of patterns. So even though the code to render our data in a tabular fashion exists in our `DataRenderer`, we don't have easy access to it, because it doesn't have the correct interface that we expect.
 
 ```c#
 using System.Collections.Generic;
@@ -96,3 +96,81 @@ namespace AdapterDemo.Model
     }
 }
 ```
+
+So the way that we can achieve that is to create that interface, and than pass that interface into the pattern renderer. So we create a new constructor for `PatternRenderer`, and we need to say that it expects some kind of adapter `IDataPatternRendererAdapter`. We also create a private field to hold that adapter. The we have to create the interface, since we don't have it, and it needs to give us back something that looks very much like our ListPattern interface. We also need to implement this interface with a concrete class `DataPatternRendererAdapter`. Then we go back to our code and make sure that it's calling the correct thing. Instead of returning `patterns.ToString()`, we have to delegate that call to the new adapter. At this point our client code is just a pass-through that just let the adapter do most of the work. We have now to render our pattern data using our renderer. To do that we are going to need an instance of `DataRenderer` inside the concrete adapter. At this point we now that we are going to need to provide some kind of a `DbData` adapter, but we don't have a `DbData` adapter that is going to work for our `IEnumerable` of patterns, so we'll have to create one of those as well, but that's ok since we can do that internally in the concrete adapter. We write an internal class `PatternCollectionDbAdapter:IDbDataAdapter` providing the `Fill` method we need. In its implementation we're going to need to go through the collection of patterns, to save them, but we don't have it, so we're going to need to create another constructor, taking a `IEnumerable` of `Pattern`, creating a local instance. Now inside the adapter we have to use this new `PatternCollectionDbAdapter`, and we do that inside `ListPatterns`, creating a new adapter; then we pass the adapter into the constructor of `DataRenderer`. Then we still have to pass back a string, and to do that we need a text writer.
+
+```c#
+using System.Collections.Generic;
+
+namespace AdapterDemo.Model
+{
+    public class PatternRenderer
+    {
+        private readonly IDataPatternRendererAdapter _dataPatternRenderer;
+
+        public PatternRenderer(IDataPatternRendererAdapter dataPatternRenderer)
+        {
+            _dataPatternRenderer = dataPatternRenderer;
+        }
+
+        public string ListPatterns(IEnumerable<Pattern> patterns)
+        {
+            return _dataPatternRenderer.ListPatterns(patterns);
+        }
+    }
+
+    public interface IDataPatternRendererAdapter
+    {
+        string ListPatterns(IEnumerable<Pattern> patterns);
+    }
+
+    public class DataPatternRendererAdapter : IDataPatternRendererAdapter
+    {
+        private DataRenderer _dataRenderer;
+
+        public string ListPatterns(IEnumerable<Pattern> patterns)
+        {
+            var adapter = new PatternCollectionDbAdapter(patterns);
+            _dataRenderer = new DataRenderer(adapter);
+
+            var writer = new StringWriter();
+            _dataRenderer.Render(writer);
+
+            return writer.ToString();
+        }
+
+        internal class PatternCollectionDbAdapter : IDbDataAdapter
+        {
+            private readonly IEnumerable<Pattern> _patterns;
+
+            public PatternCollectionDbAdapter(IEnumerable<Pattern> patterns)
+            {
+                _patterns = patterns;
+            }
+
+            public int Fill(DataSet dataSet)
+            {
+                var myDataTable = new DataTable();
+                myDataTable.Columns.Add(new DataColumn("Id", typeof(int)));
+                myDataTable.Columns.Add(new DataColumn("Name", typeof(string)));
+                myDataTable.Columns.Add(new DataColumn("Description", typeof(string)));
+
+                foreach (var pattern in _patterns)
+                {
+                    var myRow = myDataTable.NewRow();
+                    myRow[0] = pattern.Id;
+                    myRow[1] = pattern.Name;
+                    myRow[2] = pattern.Description;
+                    myDataTable.Rows.Add(myRow);
+                }
+
+                dataSet.Tables.Add(myDataTable);
+                dataSet.AcceptChanges();
+
+                return myDataTable.Rows.Count;
+            }
+        }
+    }
+}
+```
+
