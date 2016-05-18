@@ -55,3 +55,54 @@ Most names, taken alone, aren't very meaningful: for this reason, they need to b
 What you should do in this case is refactoring the function, for instance creating an `Address` class keeping all information related to addresses; inside such a class, you don't need to add prefixes any more, because `firstName` inside an `Address` class is obviously the name of a person, as part of her address.
 
 Thus, you should always use contexts of limited size, with a limited number of variables, so that the context of each name is immediately clear. Framing names inside functions, classes and namespaces, also allows us to use small names, avoiding cluttering names with unnecessary context information.
+
+## Functions
+Functions should be small, hardly 20 lines long, and their meaning should be obvious.
+
+Blocks with `if`, `else`, `while` and so on, should be one line long, where that line is probably a function call. In this way the reader is not forced to maintain the branching or conditional logic in his brain while at the same time thinking at the rest of the enclosing function.
+
+Functions shouldn't contain nested structures, thus the indenting level of functions shouldn't be grater that one or two.
+
+Functions should do one thing, should do it well, and should do it only. To correctly define what this "one thing" should be, first we break the function logic down to a series of steps, describing what the function is accomplishing, for instance:
+
+>TO RenderPageWithSetupsAndTeardowns, we check to see whether the page is a test page and if so, we include the setups and teardowns. In either case we render the page in HTML.
+
+Then we check and see if the steps we described are one level of abstraction below the stated name of the function. This is because functions are used to decompose larger concepts (the name of the function) into steps that go into more detail about how that concept is build (thus, going into a lower level of abstraction).
+
+A function isn't doing only one thing, if the steps it comprises are at many different levels of abstraction, and thus aren't just the detailed description of its title. To see this, we can try and extract other functions from the code: if that's easy to do, it means that the code is doing multiple different things inside the same function, so much so that it was easy for us to spot a different thing and extract it into its own function; if extracting code into new functions only lead to trivial functions whose names simply restate their code, it means that our original function was focused enough and didn't need any further shrinking.
+
+Again, functions that are doing only one thing can't be reasonably divided into sections, like *declarations*, *initializations*, etc.
+
+Statements inside a function should all be at the same level of abstraction. For instance, a method call like `getHtml()` is at a relatively high level of abstraction, compared to something like `PathParser.render(pagePath)`, and even more with `append("\n")`, which is less abstract than both the previous ones. This is important so that we don't mix interface code (meaning code of higher abstraction) with implementation details code (meaning code of lower abstraction).
+
+Organize functions so that each on is followed by those at the next level of abstraction. In this way, the program starts with functions at the topmost level of abstraction; then each function definition contains the implementation details of the interface represented by the function, but these details are likely other function calls; these new functions are thus at the next level of abstraction with respect to the first ones, and are written immediately after then, and so on:
+
+>To includeSetupsAndTeardowns, we include setups, then we include the test page content, and then we include the teardowns.
+
+>To includeSetups, we include the suite setup if this is a suite, then we include the regular setup.
+
+>To includeSuiteSetup, we search the parent hierarchy for the "SuiteSetUp" page and add an include statement with the path of that page.
+    
+>To searchParent...
+
+### Limit `switch` statements with polymorphism
+`switch` statements are usually source of violations of several design principle:
+- being lists of several different cases, they are large, and they make functions large;
+- being lists of how to do things in several different cases, they usually do more than one thing;
+- they violate the Single Responsibility Principle, because there's more than one reason for them to change;
+- they violate the Open Closed principle, because they can't be closed for modification, since as soon as there's a new case, they have to be modified;
+- if we are splitting code amongst multiple cases here, it's very likely that we'll have to split other code amongst the same cases in several other places.
+The solution is creating a different class or family of classes for each different case: each of them will have its own set of objects that have the responsibility of knowing how to deal with that case; then, a single Abstract Factory will contain the single `switch` statement choosing which family of classes to instantiate, depending on the current case.
+
+### Give functions long descriptive names
+If you manage to create short functions that do only one very specific thing, it will be easier to choose a descriptive name for it. Often, these names will be quite long, especially if we are naming a function deep into the abstraction hierarchy, but this is not a problem.
+
+### Use as few arguments as possible, prefer instance variables
+The ideal number of arguments for a function is zero, and the next acceptable case is one. The greater the number of argument, the strongest justification you'll need to provide for them. You should never use more than three arguments anyway. If possible, us instance variables instead, and avoid using arguments to keep output values.
+
+This is because arguments are really an implementation detail of the function interface (signature), but the client needs to know about them, because he has to provide values for them when calling the function. Thus, adding arguments forces the client to keep in mind details about the function implementation.
+
+Furthermore, functions with many arguments are difficult to test, because you should test them with all combinations of appropriate values.
+
+### With single arguments, make a question or filter input
+When creating a function with a single argument, let it either be a question about the argument, like `boolean fileExists("MyFile")`, or a filter transforming that argument into something else, like `InputStream openFile("MyFile")`.
