@@ -37,6 +37,9 @@ You shouldn't use encodings to mark interfaces, like `CustomerInterface` or `ICu
 ### Use nouns for classes, verbs for methods
 Classes and objects should be named with noun or noun phrase names like `Customer`, `Account` and `AddressParser`. Too generic purpouse names like `Manager`, `Processor`, `Data`, or `Info` should be avoided. Method names should be made out of verb or verb phrase names, like `postPayment`, `deletePate` or `save`.
 
+### Use keyword names for functions
+When choosing a name for a function, try to add to it keywords describing what its arguments are. For instance, `writeField(name)` is better than `write(name)`, because it explains that `name` is actually a `Field`. `assertExpectedEqualsActual(expected, actual)` is better than `assertEquals(expected, actual)`, because it tells us what the order of arguments is without us needing to look it up.
+
 #### Use static factory methods
 When you have different overloaded constructors, use static factory methods that describe arguments instead: `Complex fulcrumPoint = Complex.FromRealNumber(23.0)` instead of `Complex fulcrumPoint = new Complex(23.0)`, and consider using private constructors to enforce their use.
 
@@ -82,8 +85,9 @@ Organize functions so that each on is followed by those at the next level of abs
 >To includeSetups, we include the suite setup if this is a suite, then we include the regular setup.
 
 >To includeSuiteSetup, we search the parent hierarchy for the "SuiteSetUp" page and add an include statement with the path of that page.
-    
+
 >To searchParent...
+
 
 ### Limit `switch` statements with polymorphism
 `switch` statements are usually source of violations of several design principle:
@@ -106,3 +110,316 @@ Furthermore, functions with many arguments are difficult to test, because you sh
 
 ### With single arguments, make a question or filter input
 When creating a function with a single argument, let it either be a question about the argument, like `boolean fileExists("MyFile")`, or a filter transforming that argument into something else, like `InputStream openFile("MyFile")`.
+
+### Never use flag arguments
+Flag arguments are to be avoided because their purpose is making the function do two different things according to their boolean value, and functions should only do one thing. In addition to this, they are confusing because a call like `render(true)` doesn't have a clear meaning. Better to split the function into two versions: `renderForSuite()` and `renderForSingleTest()`.
+
+### Use dyadic functions only when the meaning of arguments is natural
+There are little cases in which writing a function that takes two arguments is acceptable. In a function like `Point(0, 0)` we are using two arguments, but they really are just two components of a single value, which is the set of coordinates of the point. A function like `assertEquals(expected, actual)`, while still a natural case (it's obvious that to compare for equality we need to provide two values), it's confusing though, because the ordering of arguments isn't obvious. When possible, it's better to convert dyadic functions into monadic ones, replacing certain arguments with member variables, or extracting new classes that take one argument in their constructors.
+
+### Refactor multiple arguments into their own classes
+When you feel the need to pass multiple arguments to a function, it's very likely that most, or all, of them are really part of the same concept. If this is the case, you should create a new class representing this concept, let the former arguments be properties of that class, and pass an object of that class to the function instead of the single arguments. For instance we can easily convert `Circle makeCircle(double x, double y, double radius)` into `Circle makeCircle(Point center, double radius)`.
+
+### Avoid side effects
+If a function's name doesn't explicitly state that the function is going to change the state of the system in some way (writing memory, doing I/O, etc.), but then it does (even if that's an implementation detail), that's a side effect, and means that the function is doing something different than expected, and certainly more than one thing.
+
+Side effects add temporal coupling, meaning that calling functions with side effects at different times would result in different effects, possibly introducing subtle bugs.
+
+### Avoid output arguments
+The need for using output arguments can be mitigated using the invocation object. For instance, a function like `appendFooter(s)` is confusing because it's not clear if it appends something to a footer, or appends a footer to something. In the latter case, `s` would be an output argument, and it would be much clearer if it was `report.appendFooter()`, where the argument has been converted into an invocation object.
+
+In general, if functions must change the state of something, they should change the state of their owning objects.
+
+### Use command query separation
+Functions should either perform an action changing the state of their object, or answer a question about their object, but never both. For instance, consider the function `public boolean set(String attribute, String value)`, that sets the value of a named attribute, and returns if that was successful or not. This is often used in confusing statements like `if (set("username", "name"))...`, where it's not clear if `set` is just a check if the username exists (`set` used as an adjective), or it's also setting the username (`set` used as a verb). The ambiguity is avoided separating the command from the query:
+
+```java
+setAttribute("username", "name");
+if (attributeExists("username")) {
+    ...
+}
+```
+
+### Throw exceptions instead of returning error codes
+Returning error codes from functions performing actions is a violation of the command query separation principle, because a function like this is both performing an action, and telling if that action is successful or not, and thus promotes writing statements such as `if (deletePage(page) == E_OK)` that, while not being that confusing since it's clear that they are actions (but still it would be better to place them outside an `if`, that should really contain a query, not a command), still leads to deeply nested structures.
+
+Returning an error code forces the client to deal with the error immediately:
+```java
+if (deletePage(page) == E_OK) {
+    if (registry.deleteReference(page.name) == E_OK) {
+        if (configKeys.deleteKey(page.name.makeKey()) == E_OK) {
+            logger.log("page deleted");
+        } else {
+            logger.log("configKey not deleted");
+        }
+    } else {
+        logger.log("deleteReference from registry failed");
+    }
+} else {
+    logger.log("delete failed");
+    return E_ERROR;
+}
+```
+
+Using exceptions, instead, the error management can be separated from the happy path:
+
+```java
+try {
+    deletePage(page);
+    registry.deleteReference(page.name);
+    configKeys.deleteKey(page.name.makeKey());
+} catch (Exception e) {
+    logger.log(e.getMessage());
+}
+```
+
+### Extract the body of try/catch blocks in their own functions
+Try/catch blocks add a new level to the nested structure of the code, making it less readable: it's better to extract their bodies into functions:
+
+```java
+public void delete(Page page) {
+    try {
+        deletePageAndAllReferences(page);
+    } catch (Exception e) {
+        logError(e);
+    }
+}
+```
+
+### Functions with try/catch blocks should have nothing else
+Handling errors is "a thing" on its own, and as such a function using a try/catch shouldn't do anything else, otherwise it would be doing more than one thing. The rule we can extract here is that if a function has a try/catch block, the function should start with `try` and have nothing after the `catch` or `finally` block.
+
+## Formatting
+Code inside a file should be ordered so that at the beginning of the file the more generic and abstract code is placed, and then, the more we scroll down the file, the more detailed and specific the code becomes.
+
+Concepts that are closely related should also be closely located in the same file. This, for instance, is one of the reasons why protected variables should be avoided: a protected variable is a concept closely related to code that is located in another file.
+
+Since functions should be small, local variable declarations should appear at the top of the function. Variables declared at the top of a block should be avoided. The only exception are control variables for loops, which should be declared within the loop statement.
+
+Instance variables should all be declared in the same place, be it at the top of bottom of the class.
+
+If a function is called by another, it should be placed after it, as much as possible. This allows the reader to be confident that the definitions of the used functions will follow shortly.
+
+## Objects and data structures
+The purpose of an object is to provide an abstract interface representing the meaning of the data that it's used to model. This interface should expose abstract properties of the data, and an access policy. It's very rare that the underlying implementation chosen for building this model is at the same time a good interface for understanding its meaning. Thus, avoid to expose implementation details, either with public properties, or with single getters and setters. Looking at the object interface, it should be impossible to guess the underling implementation, because in fact it would be meaningless to do so.
+
+While objects hide their data behind abstractions, exposing functions to work on it, data structures expose all their implementation details, without providing any meaningful action available to be performed on them, because they are provided externally. Thus, objects are flexible when it comes to change the way data is manipulated (implementation), but rigid when it comes to change the set of operations being provided (interface); on the other hand, data structures are flexible when it comes to add or remove functions (interface), because they are external and the data structure is not affected, but rigid when it comes to change the way data is represented (implementation).
+
+As an example, consider the following procedural example, leveraging data structures:
+```java
+public class Square {
+    public Point topLeft;
+    public double side;
+}
+
+public class Circle {
+    public Point center;
+    public double radius;
+}
+
+public class Geometry {
+    public final double PI = 3.14159;
+
+    public double area(Object shape) throws NoSuchShapeException
+    {
+        if (shape instanceof Square) {
+            Square s = (Square)shape;
+            return s.side * s.side;
+        }
+        else if (shape instanceof Rectangle) {
+            Rectangle r = (Rectangle)shape;
+            return r.height * r.width;
+        }
+        throw new NoSuchShapeException();
+    }
+}
+```
+
+In this code, using data structures instead of objects allows us to easily add new methods to the set of functions we use to manipulate the data: for instance, if we wanted to add a way to calculate the perimeter (interface change), we could just add a `perimeter()` function to `Geometry` without needing to touch all the existing data structures. On the other hand, if I added a new kind of shape (implementation change), I would need to update all existing functions of `Geometry`, teaching them how to deal with the new shape.
+
+Let's consider the object-oriented version of this example:
+```java
+public class Square implements Shape {
+    private Point topLeft;
+    private double side;
+
+    public double area() {
+        return side*side;
+    }
+}
+
+public class Circle implements Shape {
+    private Point center;
+    private double radius;
+    public final double PI = 3.14159;
+
+    public double area() {
+        return PI * radius * radius;
+    }
+}
+```
+
+Here we can see how easy it is do add a new kind of shape (implementation change) without the client code being affected at all (the client just accepts `Shape` arguments, and calls `area()` on them, without bothering of what actually is the current shape). On the other hand, if we wanted to add the `perimeter()` method (interface change), we would need to change `Shape`, and this would mean changing also all client code relying on it.
+
+In the end, then, we should understand when we need to adapt for change to the data, and use object-orientation in that case, and when we need to adapt for change to the interface, and use procedural programming in that case.
+
+The Law of Demeter states that: if a class `C` has a method `f`, the code of `f` should only call the methods of: `C` itself, or a local object created by `f`, or an object passed as argument to `f`, or, finally, an object located in an instance variable of `C`. More sintetically, `f` should only call methods on objects that it knows directly, and shouldn't call methods on objects obtained indirectly (for instance as return values of other function calls).
+
+Consider for instance this code:
+```java
+Options opts = ctxt.getOptions();
+File scratchDir = opts.getScratchDir();
+final String outputDir = scratchDir.getAbsolutePath();
+```
+
+This code could be easily rewritten as `final String outputDir = ctxt.getOptions().getScratchDir().getAbsolutePath();`. Writing it as such it looks like a violation of the Law of Demeter, since the current method has to know a lot about the inner implementations of the objects it's using. This is certainly true if those are indeed objects, and it's also a problem of those objects, because they're exposing their implementation.
+
+On the other hand, if those were not objects, but data structures, then this wouldn't constitute a problem, since data structure are exactly used to expose their implementation. In this case, however, it would have been better if we have had `final String outputDir = ctxt.options.scratchDir.absolutePath`.
+
+If those were indeed objects, how could we write this kind of logic without going against the Law of Demeter? We should be abiding by the Tell, Don't Ask principle: we shouldn't ask any object for its implementation details in order to do something with them; we should rather tell it what to do, in order for it to decide how to best perform the task according to its implementation details. So, first we need to understand why we needed to get that `outputDir` value, for instance to create a file in that directory, and then refactor the code so that we ask our object to do all the work directly:
+```java
+BufferedOutputStream bos = ctxt.createScratchFileStream(classFileName);
+```
+
+It's often useful to rely on Data Transfer Objects: classes with only public variables and no methods (thus, data structures essentially). They come in handy for instance when translating a data format into another, in multiple stages.
+
+## Error handling
+Using return codes to handle error situation ends up cluttering the caller, because it would need to check if an error occurred immediately after the call, and react to it if any happened. Using exceptions, the error situations can be handled in the place where it makes most sense, because we can move that code into an appropriate place where only error handling, and no business logic, is present.
+
+To add error handling in a consistent manner, it's useful to start with a test that asserts that an exception will be thrown: using TDD; the next step would be creating a stub method to use in that test. Since what we are testing is the exception, the first thing we need to add is a `try/catch/finally` block that executes some code throwing an exception, and converts that exception into the one we are expecting in the `try` block. Working like this, we use tests to drive us to always setup a proper error handling mechanism.
+
+A `try` block defines a transaction, meaning that, whatever happens inside the `try`, we should always end (`finally`) in a consistent state.
+
+If your function returns `null` to signal an exceptional situation, it's forcing your client to immediately react to it, but the caller might very likely not be the best place where this case can be properly handled. This often leads to deeply nested conditional structures, or internal functions calls, that clutter the codebase with code that has nothing to do with the current logic. Furthermore, if the client misses one null check, this puts the application at risk of crashing in incomprehensible ways, or having misterious behavior.
+
+In places where you would return `null`, throw an exception, or return a special case object instead. If you're relying on a third-party method that may return `null`, wrap it with a method throwing an exception or returning a special case. If the method is normally returning collections, in the case when it would return `null`, make it return an empty collection instead.
+
+Never pass `null` to methods, because they force the callee to add all kinds of conditional structures to deal with the possibility that arguments are null. Let "never pass `null`" be the default rule, and if you find a `null` being passed in the codebase, that would signal a coding error.
+
+## Boundaries
+When using interfaces at the boundary of our program, which are interfaces of the third-party APIs, we are not protected against updates of the APIs: if the third-party releases a new version with updated interfaces, we have to find and change all occurrences of it in our code, or give up updating in the first place. In addition to this, third parties usually strive to create APIs that are all-around useful: this means that a third party interface that we may be using can usually do much more than what we need that object to do; this poses us at risk of letting clients of our code be able to do unexpected and dangerous things with that object.
+
+For instance, the third party `Map` interface provides also methods to delete the elements: if we use it for collections for which the client isn't really meant to delete elements, we may have a problem if the client doesn't use our code in the way we are expecting.
+
+The solution here is to always use boundary interfaces inside the private code of methods' implementations, and never as return values or arguments: the usage of the boundary should be hidden from the client; this obviously does not apply to communications among private methods or very closely related classes.
+
+Even if third party interfaces weren't changing, and contained no more functionality that we need, they'd still be different from what our program required. For instance, we would need an interface extending another one we are using; or we would need interfaces segregated in a certain way, that the API is not respecting. This is why it's a good practice to write adapters to convert the third party interface to another interface that works best for us.
+
+## Test-Driven Development
+Unit tests need to be very readable; in particular, they should implement the "build-operate-check" pattern, which means that they should have a section where needed objects are built, a section where operations are performed on these objects, and finally a section where results of those operations are checked. To make this structure clear, unit tests should contain only code that is at the same abstraction level of these sections: details about how things are created, how operations are performed, etc., should be hidden in other functions.
+
+It's better in unit tests to use a domain specific language tailored to the needs of tests, rather than just using the same API used by production code, directly. This testing API can't typically be designed upfront, rather it evolves along with tests.
+
+Use only one assert per test method, and apply the convention of using `given`, `when`, `then` propositions to identify the standard steps of every test. For instance:
+```java
+public void testGetPageHierarchyAsXml() throws Exception {
+    givenPages("PageOne", "PageOne.ChildOne", "PageTwO");
+
+    whenRequestIsIssued("root", "type:pages");
+
+    thenResponseShouldBeXML();
+}
+
+public void testGetPageHierarchyHasRightTags() throws Exception {
+    givenPages("PageOne", "PageOne.ChildOne", "PageTwo");
+
+    whenRequestIsIssued("root", "type:pages");
+
+    thenResponseShouldContain(
+        "<name>PageOne</name>", "<name>PageTwo</name>", "<name>ChildOne</name>");
+}
+```
+
+Using only one assert per method may result in a lot of code duplication, but usually this is worth it since in this way we get tests that are way more clear and easy to understand.
+
+Tests should be fast, otherwise you won't run them as often as necessary.
+
+Tests should be independent from one another, otherwise one test failing would cause other tests to fail as well, hiding other potential errors.
+
+Tests should be repeatable in every environment, otherwise you'll always have an excuse for why they failed.
+
+Tests should be self-validating, meaning that they should return either `true` or `false`, and not reading through some other kind of output and figure out what happened. Not obeying to this rule makes failures subjective, and slows down development.
+
+Tests should be written in a timely manner, meaning just before the production code that makes them pass. Writing tests after the production code has already been written may make it hard to test it, and some code may end up being not testable.
+
+## Classes
+Classes should begin with public constants, followed by private static variables and private instance variables. It's rarely needed to have public properties. Private utilities should follow public functions using them.
+
+Properties and methods may be made protected to help writing tests. If possible, package level visibility may be used as well. Anyway, maintaining privacy is always the topmost necessity.
+
+Classes should have few responsibilities, regardless of the number of methods. Since the class name should very precisely state the responsibilities of the class, not being able to come up with a descriptive name, or relying on a generic or ambiguous one, is a symptom that the class we are creating may have too many responsibilities. Presence of the words "if", "and", "or", or "but" in the class description is also a symtom of too many responsibilities.
+
+Classes should be choese. A good way to measure choesion is counting the number of private instance variables. If a variable is used only by a small subset of methods, the class is not much cohese, and this is bad because it probably means that the class has more than one responsibility. If there's a subset of variables only used by a subset of methods, those should all be moved in another class, because they probably represent a different concept. This also makes it easier to respect the open-closed principle, because when a class has multiple responsibilities, if we have to add new functionality or change an existing one, we are forced to modify the class; but if we extract each responsibility in its own class, we can add or change behaviour just by extending them, instead of modifying the original class.
+
+Maximum cohesion is achieved when all methods use all instance variables; whilst this is very difficult to achieve, it still indicates that methods should all use a great part of the class variables. It's obvious that big classes with a lot of variables and methods will very hardly be choese enough.
+
+As per the Dependency Inversion Principles, classes should depend on abstractions, and not on concrete implementations. This favor reuse, allows to change or add functionality by extension instead of modification (open-closed principle), and helps testability.
+
+## Systems
+### Separate the construction concern
+Often applications create objects on the fly, when they need them. This couples system startup (building of all necessary objects), with business logic, while the two concerns should happen distinctly. What we should do is have a single entry point to the application, for instance a `main` module, that contains everything will be executed at the startup of the application, and have all objects constructed and wired up there. Only after all necessary objects have been constructed and connected, the business logic can happen. The application, thus, has no knowledge of the building process, and simply expects that all objects it needs are just handed to it.
+
+### Use an inversion of control mechanism
+The most common pattern to achieve this separation is *Inversion of Control*. Objects needing dependencies don't have the responsibility of instantiating those dependencies themselves: instead, that responsibility is assigned to a single authoritative object, that is the only component of the program knowing how to create objects, i.e. which instances are to be created. Inversion of control can be implemented with *Service Locator* or *Dependency Injection*. In the first case, dependent objects still have the responsibility to do the wiring: they ask an external service for the instance of the dependency they need, and the service creates it, and pass it to them; with dependency injection, instead, there's a container object injecting dependency into dependant objects, which thus have no knowledge of the wiring process either.
+
+### Use factories for objects that needs to be constructed late
+Sometimes objects can't really be constructed at the beginning of the execution, because, for example, there's not enough information to do that. In these cases, the startup should build proper factories, that are passed to the main logic, which then uses them to create the objects it needs at the proper time. The details of how the construction is done are still hidden from the business logic, though.
+
+## Emergent design
+The system's correctness must be verifiable. Therefor, the system must be comprehensively testable, and all tests must pass all of the time. To make a system more testable, we are forced to make classes smaller and more focused on a single responsibility.
+
+Having tests in place, we are free to refactor the codebase to make it cleaner, without fear of regression. Refactor is the step where we strive to employ rules of good design.
+
+During refactoring, we strive to eliminate all duplication. Duplication comes in many forms, not only identical code, or code that looks alike, but also code that is different, but serves the same purpose, or is redundant, like having both a method `int size()` and another `boolean isEmpty()`.
+
+Avoid exaggerating while minimizing the size of classes and methods: you shouldn't have too many of them either.
+
+## Concurrency
+Concurrency is a decoupling strategy, since it helps to separate what gets done from when it gets done. Applying concurrency means transforming the system from one big loop to a set of small computers collaborating.
+
+Code dealing with concurrency is complex enough to be by itself another reason to change. This means that, following the Single Responsibility Principle, concurrent code should be moved to its own classes. Concurrent code should thus be always separated from other code.
+
+You should minimize the number of places where you use shared data among multiple threads. Shared data should be strictly encapsulted, and only a very few selected clients should be able to access it.
+
+It's often possible to just pass read-only copies of data to other threads, instead of actually sharing it. Or, you can pass copies that will get modified, and then gather all modified versions in a single thread and merge them.
+
+When designing the multithreaded application, strive to make threads as independent as possible, partitioning data in indepenent subsets, such that there is the smaller need for sharing as possible.
+
+Always try to use data structures that are optimized for concurrency.
+
+In the producer-consumer execution model, ore or more producer threads set up work to do in a queue, and then one or more consumer thread pick up the work from the queue and complete it. The queue is a bound resources, so producers must wait for free space to appear in the queue, and consumers must wait for some work to be present in the queue. Communication is needed, because producers put work in the queue and signal that the queue is no longer empty, while consumer take work from the queue and signal that the queue is no longer full.
+
+In the readers-writers execution model, writer threads modify a shared resource that needs to be read by reader threads. Readers can't read a resource being currently written; readers must be served as fast as possible, and this can cause starvation, preventing writers to ever be able to write a particularly requested resource; on the other hand, allowing writers to write can force readers to wait, decreasing throughput.
+
+In the dining philosophers execution model, multiple threads need a certain amount of shared resources to work, and threads must wait that resources are available before starting working. In this situation several problems may occurr, such as deadlock and efficiency degradation.
+
+Avoid using more than one method on a shared object. If you need to use more methods on an object you're currently holding the lock of, you can apply the following strategies: with client-based locking, you have the client lock the server before calling the first methods, so that the lock's extent includes code calling the last method; with server-based locking, you add a method to the server that locks it, and call all needed methods, then unlock: the client then calls that method; with adapted server, you create an intermediary that performs the locking (this happens with server-based locking, when you can't change the server).
+
+Keep synchronized sections as small as possible, because locks create delays and add overhead, so there should be as few and as short as possible.
+
+## Final notes - best practices
+When dealing with third party libraries, it's always useful to wrap them inside custom classes. In this way you can decouple your code from the library interface, while still exploiting its functionality: this means that you can use your own interface (maybe an already existing one) instead of being forced to adapt your code to the third party interface, for instance rethrowing the library exceptions using local ones instead, or changing the way error situations are mapped to exceptions; then it will be easier in the future to move to a different library, having only one place in the code to change (the wrapper); in addition to this, it's easier to mock third-party calls inside tests.
+
+It often happens that we need to add a special case to a piece of business logic. Consider this example:
+```java
+try {
+    MealExpenses expenses = expenseReportDAO.getMeals(employee.getID());
+    m_total += expenses.getTotal();
+} catch (MealExpensesNotFound e) {
+    m_total += getMealPerDiem();
+}
+```
+
+Here we are using the occurrence of an exception to drive the business logic: if no meals is found for the given employee, a standard value should be used instead, but we are using the exception mechanism to know when this special business logic case occurrs. This is a bad practice, since exceptions should be used for cases outside of the business rules, they should be separated from the normal logic expressed by code. This is the typical situation where the "special case" pattern can be applied: the solution here is to create an interface representing the concept that has the special case, in this case it would be a `MealExpenses` type, and create two different implementations of this interface, one for the regular case, and the other for the special case. The client code only works with the interface, so it won't be bothered by the fact that the current case is special or not.
+```java
+// Client code
+MealExpenses expenses = expenseReportDAO.getMeals(employee.getID());
+m_total += expenses.getTotal();
+
+// Service code
+public class PerDiemMealExpenses implements MealExpenses {
+    public int getTotal() {
+        // return the per diem default
+    }
+}
+```
