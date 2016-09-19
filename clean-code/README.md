@@ -398,8 +398,11 @@ Avoid using more than one method on a shared object. If you need to use more met
 Keep synchronized sections as small as possible, because locks create delays and add overhead, so there should be as few and as short as possible.
 
 ## Final notes - best practices
+
+### Wrap third party libraries
 When dealing with third party libraries, it's always useful to wrap them inside custom classes. In this way you can decouple your code from the library interface, while still exploiting its functionality: this means that you can use your own interface (maybe an already existing one) instead of being forced to adapt your code to the third party interface, for instance rethrowing the library exceptions using local ones instead, or changing the way error situations are mapped to exceptions; then it will be easier in the future to move to a different library, having only one place in the code to change (the wrapper); in addition to this, it's easier to mock third-party calls inside tests.
 
+### The special case pattern
 It often happens that we need to add a special case to a piece of business logic. Consider this example:
 ```java
 try {
@@ -423,3 +426,13 @@ public class PerDiemMealExpenses implements MealExpenses {
     }
 }
 ```
+
+### Test polymorphism to choose if to use static
+The least important reason to make a method `static` is if it depends only on its arguments, and not on any notion of "current state" that may be encapsulated into an object. This is the least important reason, because it's easy to game this rule, moving state from the invocation object to an argument:
+
+```java
+HourlyPayCalculator.calculatePay(employee, overtimeRate)
+```
+
+Here, `calculatePay` might have as well be a method of an `Employee` class, where `employee` would have been the invocation object instead of an argument.
+How to tell, then, when it makes sense to use static? The most important rule is checking if there's a need for that method to be polymorphic: would be useful if this method (or better, its signature) had different implementations according to different concrete types of `Employee` that we might use? If we realize that we could need to write multiple different versions of `calculatePay` related to different types of `Employee`s, then it's better to make `calculatePay` an instance method, rather than a static one.
