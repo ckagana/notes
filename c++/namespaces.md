@@ -206,4 +206,3 @@ As of C++ 11, defining aliases with `typedef` or `using` is almost the same, wit
 
 ### References
 - http://en.cppreference.com/w/cpp/language/type_alias
-- http://stackoverflow.com/questions/10747810/
