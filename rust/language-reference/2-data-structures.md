@@ -241,3 +241,131 @@ let martian = PlanetaryMonster::MarsMonster("Chela", 42);
 
 this means that a `PlanetaryMonster` object can be either a `VenusMonster` or a `MarsMonster` (thus the union type). However, any number of values of these two types can be contained in the set of `PlanetaryMonster`, which doesn't happen with usual Enumerations.
 
+
+## Matching patterns
+
+Rust has a very special `switch` construct, which is called `match`. It has many uses, the simplest of which is exactly the same as `switch`:
+```rust
+let a = 2;
+match a {
+	1 => println!("Value is 1"),
+	2 => println!("Value is 2"),
+	_ => println!("Unknown value")
+}
+```
+
+The `default` case corresponds here to the `_` character, which matches any (remaining) value. All possible cases must always be handled by a match: if we left out the default `_` case, for example, we would've get an error from the compiler. If we have nothing to do with a case, we can use `{}` to run no code:
+```rust
+match a {
+	1 => println!("Value is 1"),
+	_ => {}
+}
+```
+
+Unlike the switch construct in other languages, in Rust's match we don't need to explicitly `break` out of the construct at every value match, because after a match is found the execution immediately exits the match construct. However, it's still possible to handle multiple cases with the same code, either enumerating them with the `|` operator, or defining a range with the `...` operator:
+```rust
+match a {
+	1 => println!("Value is 1"),
+	2 => println!("Value is 2"),
+	3|4|5 => println!("Value is either 3, 4 or 5"),
+	6..9 => println!("Value is between 6 and 9"),
+	_ => println!("Unknown value")
+}
+```
+
+when matching multiple values, we can capture the actual value with the `@` operator:
+```rust
+match a {
+	num @ 1|2 => println!("Small value is {}", num),
+	value @ 3...5 => println!("Big value is {}", value),
+	_ => println!("Unknown value")
+}
+```
+
+Like `if` constructs, match is actually an expression, and as such it can return a value:
+```rust
+let b = match a {
+	1 => "Value is 1",
+	2 => "Value is 2",
+	_ => "Unknown value"
+};
+println!("{}", b);
+```
+
+of course all matches must return values of the same type for this to work.
+
+However, in Rust match constructs play particularly well with data structures. First of all, we can use match constructs to destructure unions:
+```rust
+enum Union {
+	First(&'static str),
+	Second
+}
+let union = Union::First("Hey Joe");
+match union = {
+	Union::First(string) => println!("String is {}", string),
+	_ => println("No string")
+}
+```
+
+Alternatively, we can destructure a union also with an `if` construct:
+```rust
+if let Union::First(string) = union {
+	println!("{}", string);
+}
+```
+
+which would be equivalent to:
+```rust
+match union {
+	Union::First(string) => println!("{}", string),
+	_  => {}
+}
+```
+
+or with a loop:
+```rust
+while let Union::first(string) = union {
+	println!("{}", string);
+	break;
+}
+```
+
+here we must use `break`, since the `let` expression is evaluated to `true`, making this an infinite loop.
+
+You might think that we could also destructure a union with a simple `let` binding, but this won't work:
+```rust
+let Union::first(string) = union; // ERROR! Second case not handled
+```
+
+so it turns out that `if` and `while` constructs automatically handle the other cases of the union.
+
+We can also destructure other data structures with match constructs, like tuples or structs:
+```rust
+let loki = ("Loki", true, 800u32);
+match loki {
+	(name, _, power) => println!("{} has power {}", name, power),
+	_ => println!("Unrecognized god")
+}
+```
+
+of course we must always ensure that all possible cases are handled, especially if we use the `_` character while destructuring.
+
+We can use the `if` constructs as *guards* inside matches:
+```rust
+match loki {
+	(name, demi, _) if demi => println!("Demigod called {}", name),
+	(name, _, _) if name == "Thor" => println!("This is Thor"),
+	(_, _, power) if power <= 1000 => println!("This is a powerless god"),
+	_ => println!("Unrecognized god")
+}
+```
+
+Using guards and the `@` operator we can apply arbitrarily complex conditions to the matched value:
+```rust
+match a {
+	a @ _ if a < 0 => println!("Negative"),
+	_ => println!("Positive")
+}
+```
+
+we don't have a way to test if the matched number is negative using ranges, because we don't have a range from minus infinity to zero. Thus we first accept all values of `a` with `a @ _`, which basically means "if `a` is any value", and it's just a trick to give a name to the value, and then delegate the duty of verifying the condition to the guard, with `if a < 0`.

@@ -10,10 +10,10 @@
 
 Values can be assigned to identifiers with the usual `=` operator. In Rust an assignment is like:
 ```rust
-const PI: f32 = 3.14;
+const PI:f32 = 3.14;
 ```
 
-where the `const` modifier specifies the type of identifier we want to declare, which is followed by the identifier itself `PI`, the type annotation `f32` introduced by the `:` character. Next to this the `=` operator assigns the `3.14` value to the identifier.
+where the `const` modifier specifies the type of identifier we want to declare, which is followed by the identifier itself `PI`, and the type annotation `f32` introduced by the `:` character. Next to this the `=` operator assigns the `3.14` value to the identifier.
 
 
 ## Constants
@@ -22,7 +22,7 @@ The most common identifiers are variables and constants. Rust supports two types
 
 Constants defined with the `const` keyword are just inlined during compilation, meaning that all their occurrences in the code are replaced with their actual value:
 ```rust
-const PI: f32 = 3.14.
+const PI: f32 = 3.14;
 ```
 
 The fact that they are inlined means that you can never be sure of what exact memory is being used at every occurrence of the constant, so new memory might be allocated each time a new value is used.
@@ -196,7 +196,36 @@ In Rust conditionals are expressions as well:
 let active = if health >= 50 { true } else { false };
 ```
 
-again, we must omit the semicolon to let the two values `true` and `false` be returned by the block, and assigned to the variable. Of course, conditional constructs must return values of the same type for them to be used as expressions.
+again, we must omit the semicolon to let the two values `true` and `false` be returned by the block, and assigned to the variable. Of course, conditional constructs must return values of the same type for them to be used as expressions. We can return the value of an `if` block from a function, but we must be ware that all branches should be part of the `if`:
+```rust
+fn my_fun(v: i32) -> i32 {
+	if v > 0 {
+		2 * v // ERROR! We are not returning the value of `if` because we are returning the next line instead
+	}
+	3 * v
+}
+```
+
+in this case the last line is correct, since we're avoiding to consume its value, in order for it to be returned, but we are doing the same inside the `if`, which is not being returned, and as such must not be used as an expression (the actual error message would say that the unit type `()` was expected, but an `i32` was found instead). To fix this, we either have to explicitly `return` from inside the `if`, or incorporate also the last line inside the `if`, and return the `if` itself as an expression:
+```rust
+fn my_fun(v: i32) -> i32 {
+	if v > 0 {
+		return 2 * v;
+	}
+	3 * v
+}
+```
+
+or:
+```rust
+fn my_fun(v: i32) -> i32 {
+	if v > 0 {
+		2 * v
+	} else {
+		3 * v
+	}
+}
+```
 
 
 ## References

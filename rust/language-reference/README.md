@@ -5,4 +5,3 @@
 
 ## References
 - Rust Essentials, Balbaert, 2015
-
