@@ -198,11 +198,15 @@ let Player{ health: ht, name: nn, .. } = pl1;
 pritnln!("Player {} has {} health", nn, ht);
 ```
 
-in this case, however, the character to skip unwanted fields is `..` instead of `_`.
+in this case, however, the character to skip unwanted fields is `..` instead of `_`. We can get references to fields instead of copies of the values with the `ref` keyword:
+```rust
+let Player{ health: ref ht, name: nn, .. }} = pl1;
+// now health is a reference of type &ht, instead of a value of type ht
+```
 
 Unlike tuples, structs (both tuple structs and proper structs) define new types, meaning that the `pl1` variable of the preceding example has in fact the type `Player`.
 
-As in arrays and vectors, also in tuples and structs pointers are automatically dereferences when accessing fields, without the need to use the dereferencing operator `*`:
+As in arrays and vectors, also in tuples and structs pointers are automatically dereferenced when accessing fields, without the need to use the dereferencing operator `*`:
 ```rust
 let tpl = ("Hey", 1);
 let tplp = &a;
@@ -279,6 +283,29 @@ match a {
 	num @ 1|2 => println!("Small value is {}", num),
 	value @ 3...5 => println!("Big value is {}", value),
 	_ => println!("Unknown value")
+}
+```
+
+It's actually possible to always use an identifier for the matched values, even without any condition:
+```rust
+match a {
+    num => println!("Value is {}", num)
+}
+```
+
+of course we don't need to handle the default case here, because our variable `num` already matches all cases. This would be pretty useless, wasn't it necessary in the case we wanted to obtain a reference to the matched value, instead of a copy of it, using `ref` and `ref mut`:
+```rust
+let n = 42;
+match n {
+    ref r => println!("{:p}", r), // prints the address of r
+}
+
+let mut m = 42;
+match m {
+    ref mut mr => {
+        println!("{:p}", mr);
+        *mr = 43; // here we're actually changing the original value
+    }
 }
 ```
 

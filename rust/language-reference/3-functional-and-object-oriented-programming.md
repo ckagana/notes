@@ -1,3 +1,13 @@
+# Functional and Object-Oriented Programming
+
+- [Higher-order functions](#higher-order-functions)
+- [Iterators](#iterators)
+- [Consumers and adapters](#consumers-and-adapters)
+- [Generics](#generics)
+- [`Option`, `Result` and error handling](#option-result-and-error-handling)
+- [Methods](#methods)
+- [Traits](#traits)
+
 ## Higher-order functions
 
 In Rust functions are first-class elements, meaning that they can be treated exactly as any other value, namingly assigned to variables, passed as function arguments, and returned from functions.
@@ -165,7 +175,7 @@ fn second<T>(pair: Pair<T>) -> T {
 ```
 
 
-## Option, Result and error handling
+## `Option`, `Result` and error handling
 
 `Option` and `Result` are two union types provided by the Rust standard library that are widely used. Option represent a value that can be present or not:
 ```rust
@@ -248,7 +258,7 @@ Because of how type inference work in Rust, there's no need to support method ov
 
 ## Traits
 
-Rust doesn't have interfaces as programming constructs, like other languages like Java or C# do, but what it's usually implemented with interfaces, Rust does with traits. Let's say that we want to define an interface `Monster`, featuring an `attack()` method: in Rust we would do:
+Rust doesn't have interfaces as programming constructs, like other languages like Java or C# do, but what is usually implemented with interfaces, Rust does with traits. Let's say that we want to define an interface `Monster`, featuring an `attack()` method: in Rust we would do:
 ```rust
 trait Monster {
 	fn attack(&self);
