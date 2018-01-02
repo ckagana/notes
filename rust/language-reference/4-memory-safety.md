@@ -223,7 +223,7 @@ struct ImportantExcerpt<'a> {
 }
 ```
 
-### References
+### Resources
 - https://doc.rust-lang.org/book/second-edition/ch10-03-lifetime-syntax.html
 
 
