@@ -9,6 +9,8 @@
 The following arguments, that still are present in the resources, have been omitted, because not interesting or too advanced at the present moment:
 - special pointers (like Boxes)
 - macros
+- parallel computing
+- unsafe code
 
 
 ## Resources
