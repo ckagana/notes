@@ -4,7 +4,6 @@
 - [Iterators](#iterators)
 - [Consumers and adapters](#consumers-and-adapters)
 - [Generics](#generics)
-- [`Option`, `Result` and error handling](#option-result-and-error-handling)
 - [Methods](#methods)
 - [Traits](#traits)
 
@@ -173,42 +172,6 @@ fn second<T>(pair: Pair<T>) -> T {
 	pair.second
 }
 ```
-
-
-## `Option`, `Result` and error handling
-
-`Option` and `Result` are two union types provided by the Rust standard library that are widely used. Option represent a value that can be present or not:
-```rust
-enum Option<T> {
-	Some(T),
-	None
-}
-```
-
-a function that might return a value or not, will return an Option. If a value is present, the Option will be an instance of `Some`; if no value is present, the Option will be `None`. For example, the `next()` method of iterators returns an Option, because if there is a next element to fetch, relatively to the current position of the iterator cursor, then a `Some` will be returned, containing the actual value; on the other hand, if the iterator's cursor has reached the last element, calling `next()` will produce `None`, indicating that there is no value anymore. Another common scenario where to use Option is with user input: since we cannot control the user behaviour, we must account for the chance that the user won't insert a value in the user interface.
-
-Result represent the result of a computation, that can be either successful, or an error:
-```rust
-enum Result<T, E> {
-	Ok(T),
-	Err(E)
-}
-```
-
-if the computation was successful, its result (of type `T`) will be wrapped inside an instance of `Ok`. If the computation produced an error instead, the error will be returned, wrapped in an instance of `Err`, having type `E` (usually a string with the error message).
-
-Rust uses Results as replacements for the exception mechanism that other languages use. This means that when we define a function that might throw an error, we should return a `Result` instead of the raw return type:
-```rust
-fn sqroot(r: f32) -> Result<f32, String> {
-	if r < 0.0 {
-		Err("Number cannot be negative!".to_string())
-	} else {
-		Ok(Float::sqrt(r))
-	}
-}
-```
-
-this also means that in Rust there are no `null` values that can be returned from functions and propagate uncontrollably around the code.
 
 
 ## Methods
