@@ -28,7 +28,7 @@ src/
 ```rust
 // main.rs
 mod dep1;
-mod functions.rs
+mod functions;
 use functions::get_result;
 
 fn main() {
@@ -42,20 +42,20 @@ here we must declare both `dep1` and `functions` because they are at the same le
 // lib.rs
 mod test;
 mod functions;
-mod mod1;
+mod dep1;
 ```
 
 here we must declare both `dep1` and `functions` for the same reason as `main.rs` (remember that `lib.rs` is run when `main.rs` is not run, and vice-versa, so they both act as entry-points for the program). Also, here we must declare `test` otherwise Cargo won't be able to load the `test` module to run the first-level tests.
 ```rust
 // functions.rs
-use mod1::smt;
+use dep1::smt;
 
 pub fn get_result() -> i32 {
     smt()
 }
 ```
 
-here we can just use `use mod1::smt` since the module has already been declared in the root file (whichever it will be: `main.rs` or `lib.rs` according to the way these files are run). Not that we could have declared it here: it would have been an error since they are at the same level of the hierarchy.
+here we can just use `use dep1::smt` since the module has already been declared in the root file (whichever it will be: `main.rs` or `lib.rs` according to the way these files are run). Not that we could have declared it here: it would have been an error since they are at the same level of the hierarchy.
 ```rust
 // test.rs
 #[cfg(test)]
