@@ -1,3 +1,5 @@
+# JSP
+
 JSP is a technology designed to simplify writing the body of the servlet responses, namely, to avoid having to write the body inside `String` literals, and to `append()` them to the `PrintWriter` response object. JSP is a template engine, that allows you to combine HTML tags, Java code, and JSP tags in the same source. Other template engines exist of course, for instance Facelets, which are part of the JavaServer Faces (JSF) framework, or Velocity, Freemarker, SiteMesh, Tiles, etc.
 
 JSP code is interpreted by the JSP compiler, which creates a new servlet class for each JSP file. In particular, the compiled JSP extends `HttpServlet.HttpJspBase`, which in turn is a servlet. What this servlet does, is practically turn the HTML you wrote in the JSP files into strings, appended to the servlet's output stream. All of this is done in the `_jspService()` method, which is called by the servlet `service()` method.

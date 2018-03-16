@@ -1,11 +1,15 @@
-# Introduction to Java servlets
+# Servlets
 
 
 In Java EE, *Servlets* are the software components responsible for receiving Web requests, and responding to them. Servlets can only be instantiated and run by a Web container, which is the one providing them with requests, and taking responses from them.
 
+
+## Creating a servlet class
+
 To use servlets in your application, you need to link the Java servlet library to your application. Using Maven, this is a matter of adding the following dependency:
 
 ```xml
+<!-- pom.xml -->
 <dependency>
     <groupId>javax.servlet</groupId>
     <artifactId>javax.servlet-api</artifactId>
@@ -46,6 +50,9 @@ public class HelloServlet extends HttpServlet
 
 The default content type of the response is `text/plain`. The servlet response automatically takes care of using default headers and properly formatting the HTTP for the underlying socket. Additionally, you don't have to call `close()` on the `PrintWriter` stream you're using: this is because the best practice suggests that the owner of a resource, meaning who created it, is responsible for closing it; in this case the Web container created the stream, and as such it will also close it.
 
+
+## Servlet initialization and destruction
+
 All methods dealing with user requests suffer from the same problem: they are called too late in the execution flow. Usually, any slightly complex application needs to do some setup work before it's able to properly handle user requests, like setting up database connections, reading configuration files, etc. The way we do these kinds of things with servlets, is through the `init()` method. This is called by the Web container when the servlet is started, typically during the deployment (but this really depends on the configuration of the servlet).
 
 Analogous to it is the `destroy()` method, called by the Web container when the servlet cannot accept requests anymore, typically when the application is stopped or the Web container is shut down. Since at this moment the application is being terminated, you don't have to wait for the garbage collector to call `finalize()` to release the open resources: hence, this should be done directly inside `destroy()`. Should you try to release resources inside `finalize()`, instead, you'd have to wait several minutes before the garbage collector runs, because it is tied to the Web container, which is still running after your servlet has been terminated; the consequence of this may be that your application is partially undeployed, or that its undeployment fails.
@@ -66,10 +73,14 @@ public void destroy()
 
 The `init` method should throw a `ServletException` if something went wrong during the initialization, that prevents the servlet from running properly. If this happens, any request handled by this servlet will be responded with `503 Service Unavailable`.
 
+
+## Servlet setup
+
 Writing a servlet class is not enough to have a working Web application. What we need to do now is configuring the deployment descriptor so that our servlet is properly deployed to the Web container. The deployment descriptor defines the listeners, servlets, filters and settings that should be deployed with the application.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8" ?>
+<!-- src/main/webapp/WEB-INF/web.xml -->
 <web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee
@@ -137,11 +148,15 @@ We can instantiate the same servlet multiple times:
 
 In this case, instead, `oddsStore` and `endsStore` are two distinct servlets, that are two different instances of the same servlet class, `net.slc.jgroph.StoreServlet`. This can be done, for instance, to access the same logic, with different configuration. It's possible to get the name of the servlet instance from inside the servlet class calling `this.getServletName()`. Beware that instantiating the same servlet class multiple times using annotations only is not possible.
 
+
+### Servlet setup with annotations
+
 If you're using the servlet API 3.0 or greater, you can avoid defining your servlets in the deployment descriptor `web.xml`, and adding annotations to your servlet class instead:
 
 ```java
 ...
 import javax.servlet.annotations.WebServlet
+
 @WebServlet(name="helloServlet", urlPatterns={"/greeting", "/salutation", "/wazzup"}, loadOnStartup=1)
 public class HelloServlet extends HttpServlet
 {
@@ -151,40 +166,73 @@ public class HelloServlet extends HttpServlet
 
 The deployment descriptor must still exist, though, and have a valid servlet API 3.0 header. The `<display-name>` tag must also stay there.
 
-Along with a Web request, come *request parameters*. They contain information sent by the client to the application. This can be done via query parameters, or via form variables. Query parameters are supported by several request methods (`GET`, `POST`, `HEAD`, ...) like in:
 
+### Dependency injection and unit testing *
+
+Normally servlets are automatically constructed by the application server, making it impossible to inject dependencies in the constructor, and, by extension, to properly unit test them with mock objects. There are at least two solutions to this problem.
+
+In case we are using only one servlet, for example implementing the front controller pattern, or more in general if the same dependencies must not be injected in more than one servlet, we can just provide an overloaded constructor where the dependencies are injected, while in the constructor with no arguments (which will be called by the application server) default values for the dependencies will be provided:
+```java
+...
+
+@WebServlet(name="helloServlet", urlPatterns={"/greeting", "/salutation", "/wazzup"}, loadOnStartup=1)
+public class HelloServlet extends HttpServlet
+{
+    private final Dependency dependency;
+
+    public HelloServlet()
+    {
+        this(null);
+    }
+
+    public HelloServlet(final Dependency dependency)
+    {
+        this.dependency = dependency == null ? new Dependency() : dependency;
+    }
+
+    ...
+}
 ```
-GET /index.jsp?productId=9781118656464&category=Books HTTP/1.1
+
+This of course can be done only if we have all information needed to create the dependency on our own when no instance is injected, for example if the dependency is some high level tool, like a dependency injection container.
+
+For a solution that works in all cases, it's possible to register a listener to the servlet context events. For example, we can hook to the context initialization event, and add custom servlets to the context, instead of letting the default servlet setup do it.
+
+The listener class must implement `ServletContextListener`, and can be configured to listen to the servlet events using the `WebListener` annotation:
+
+```java
+import javax.servlet.ServletContext;
+import javax.servlet.ServletContextEvent;
+import javax.servlet.ServletContextListener;
+import javax.servlet.annotation.WebListener;
+
+@WebListener
+public class Bootstrap implements ServletContextListener
+{
+    @Override
+    public void contextInitialized(final ServletContextEvent event)
+    {
+        final Dependency dependency = new Dependency();
+        final HelloServlet servlet = new HelloServlet(dependency);
+
+        final ServletContext context = event.getServletContext();
+        context.addServlet("helloServlet", servlet).addMapping("/greeting");
+    }
+
+    @Override
+    public void contextDestroyed(final ServletContextEvent event)
+    {
+
+    }
+}
 ```
 
-or
+`ServletContextListener` requires to implement the two methods `contextInitialized()` and `contextDestroyed()`. The servlet context of the application can be retrieved from the event that is passed as argument to these methods. From the `contextInitialized()` method, then, we can explicitly construct the servlets we need, thus injecting all dependencies required, and register them to the context.
 
-```
-POST /index.jsp?returnTo=productPage HTTP/1.1
-Host: www.example.com
-Content-Length: 48
-Content-Type: application/x-www-form-urlencoded
+This way of registering servlets has lower precedence than the default configuration: for example, if we used the `WebServlet` annotation on the servlet class, that class would have been automatically created by the application server, and *not* by our listener. Thus, we should check that the servlet we want to build inside the listener is not already configured to be created by the application server. If the servlets are located inside the same package as the listener, we could for example make them package-level visible (so using no visibility qualifier, instead of `public`, in the class definition).
 
-addToCart&productId=9781118656464&category=Books
-```
 
-In this last example we are seeing both query parameters (`returnTo`), and form variables (`addToCart` and `productId`).
-
-The servlet API does not differentiate between these two kinds of parameters. The `getParameter()` method takes the parameter name, and returns a single value for a paramter. If a parameter has more than one value, the first one is returned. The `getParameterValues()` method returns an array of values instead. If the parameter has only one value, an array with only one element is returned. The `getParameterMap()` method returns a `java.util.Map<String, String[]>` object containing the parameter names mapped to their values. The `getParameterNames()` returns an enumeration of the parameter names.
-
-The input stream of a request can be read only once. If you call `getInputStream()` or `getReader()` on the request object, and later try to call any of the parameters methods, you'll get an `IllegalStateException`. The same happens vice-versa.
-
-The `getContentType()` method returns the MIME content type of the request, such as `application/json`. The `getContentLength()` and `getContentLengthLong()` methods return the content length of the request body (the latter works also when the content exceeds 2 gigabytes). The `getCharacterEncoding()` method returns the character encoding of the request, such as UTF-8, whenever the request is of character type.
-
-The `getRequestURL()` method returns the entire request URL, excluding the query string. The `getRequestURI()` method returns only the server path of the request. If the request is `/hello-world/greeting?foo=world`, and the application is deployed as `/hello-world`, and the servlet mappings is `/greeting`, then `getServletPath()` will return only `/greeting`. The `getHeader()` method returns the value of a header, given its name, the header name being case-insensitive; if one header has multiple values, this method only returns the first one. The `getHeaders()` method returns an enumeration of all values of a specified header. The `getHeaderNames()` method returns an enumeration of all the headers in the request. The `getIntHeader()` method returns an header value as an integer; if it cannot be converted to integer, a `NumberFormatException` is thrown. The `getDateHeader()` method returns the Unix timestamp in milliseconds of a header value representing a valid timestamp (otherwise an `IllegalArgumentException` is thrown).
-
-To write to the response body, you can choose between `getOutputStream()` and `getWriter()`, according to you wanting to write raw bytes, or text. As with the request object, you can write to the response only once: if you attempt to do it twice, you'll get an `IllegalStateException`.
-
-The `setContentType()` and `setCharacterEncoding()` methods allow you to specify the response content type and character encoding. You can call them many times, each overwriting the previous one, but they must be called before writing to the response body (otherwise they're ignored).
-
-You can use `setHeader()`, `setIntHeader()` and `setDateHeader()` to specify the response headers. To avoid overwriting existing values, and add new ones instead, you can use `addHeader()`, `addIntHeader()` and `addDateHeader()`. You can inspect which headers are already defined with `getHeader()`, `getHeaders()`, `getHeaderNames()` and `containsHeader()`.
-
-Additionally, you can use `setStatus()`, `getStatus()`, `sendError()` and `sendRedirect()`.
+## Servlet configuration
 
 There are many ways of handling configuration for your servlets. Two of these are *context init parameteters*, and *servlet init parameters*.
 
@@ -257,6 +305,47 @@ public class ServletParameterServlet extends HttpServlet
 
 This, however, makes little sense, since the purpose of configurations is to be able to change them without recompiling the application (you just need to restart the deployed application). Adding servlet parameters as annotations to the servlet class would require to recompile the application at each configuration change (not to talk about saving sensitive information like database connection credentials to your VCS repository).
 
+
+## Request parameters
+
+Along with a Web request, come *request parameters*. They contain information sent by the client to the application. This can be done via query parameters, or via form variables. Query parameters are supported by several request methods (`GET`, `POST`, `HEAD`, ...) like in:
+
+```
+GET /index.jsp?productId=9781118656464&category=Books HTTP/1.1
+```
+
+or
+
+```
+POST /index.jsp?returnTo=productPage HTTP/1.1
+Host: www.example.com
+Content-Length: 48
+Content-Type: application/x-www-form-urlencoded
+
+addToCart&productId=9781118656464&category=Books
+```
+
+In this last example we are seeing both query parameters (`returnTo`), and form variables (`addToCart` and `productId`).
+
+The servlet API does not differentiate between these two kinds of parameters. The `getParameter()` method takes the parameter name, and returns a single value for a paramter. If a parameter has more than one value, the first one is returned. The `getParameterValues()` method returns an array of values instead. If the parameter has only one value, an array with only one element is returned. The `getParameterMap()` method returns a `java.util.Map<String, String[]>` object containing the parameter names mapped to their values. The `getParameterNames()` returns an enumeration of the parameter names.
+
+The input stream of a request can be read only once. If you call `getInputStream()` or `getReader()` on the request object, and later try to call any of the parameters methods, you'll get an `IllegalStateException`. The same happens vice-versa.
+
+The `getContentType()` method returns the MIME content type of the request, such as `application/json`. The `getContentLength()` and `getContentLengthLong()` methods return the content length of the request body (the latter works also when the content exceeds 2 gigabytes). The `getCharacterEncoding()` method returns the character encoding of the request, such as UTF-8, whenever the request is of character type.
+
+The `getRequestURL()` method returns the entire request URL, excluding the query string. The `getRequestURI()` method returns only the server path of the request. If the request is `/hello-world/greeting?foo=world`, and the application is deployed as `/hello-world`, and the servlet mappings is `/greeting`, then `getServletPath()` will return only `/greeting`. The `getHeader()` method returns the value of a header, given its name, the header name being case-insensitive; if one header has multiple values, this method only returns the first one. The `getHeaders()` method returns an enumeration of all values of a specified header. The `getHeaderNames()` method returns an enumeration of all the headers in the request. The `getIntHeader()` method returns an header value as an integer; if it cannot be converted to integer, a `NumberFormatException` is thrown. The `getDateHeader()` method returns the Unix timestamp in milliseconds of a header value representing a valid timestamp (otherwise an `IllegalArgumentException` is thrown).
+
+To write to the response body, you can choose between `getOutputStream()` and `getWriter()`, according to you wanting to write raw bytes, or text. As with the request object, you can write to the response only once: if you attempt to do it twice, you'll get an `IllegalStateException`.
+
+The `setContentType()` and `setCharacterEncoding()` methods allow you to specify the response content type and character encoding. You can call them many times, each overwriting the previous one, but they must be called before writing to the response body (otherwise they're ignored).
+
+You can use `setHeader()`, `setIntHeader()` and `setDateHeader()` to specify the response headers. To avoid overwriting existing values, and add new ones instead, you can use `addHeader()`, `addIntHeader()` and `addDateHeader()`. You can inspect which headers are already defined with `getHeader()`, `getHeaders()`, `getHeaderNames()` and `containsHeader()`.
+
+Additionally, you can use `setStatus()`, `getStatus()`, `sendError()` and `sendRedirect()`.
+
+
+## Enabling file uploads
+
 To allow file uploads, we enable it with the `multipart-config` definition:
 
 ```xml
@@ -278,6 +367,9 @@ When you send POST request, by default the data you are sending is encrypted by 
 The `multipart-config` is enough to handle data coming from such type of forms. However, using them at the Java code level requires to handle the specific parts instead of the higher level parameters. Usual non-file input values are stored as parameters, exactly like usual `application/x-www-form-urlencoded` forms. However, you can't receive binary data as parameters, since `ServletRequest.getParameter()` returns a string, so you have to use the `getPart()` method, taking the field name as well, and returning an instance of `javax.servlet.http.Part`, which in turn can be read with the `getInputStream()` method. The `getSubmittedFileName()` returns the original file name before it was uploded.
 
 Then, if you want the user to download some binary data, you have to craft a special response, having the `Content-Disposition` header set to `attachment; filename=your-file-name` (forcing the user's browser to download the file instead of opening it inside the browser) and content type set to `application/octet-stream`. Then you can write the binary data directly to `response.getOutputStream()`. If you want to allow downloading of large files, storing them in memory as a whole may not be performance savy: in this case you would want to open an `InputStream` from that file, and directly copy bytes from it to the `ResponseOutputStream`, and flush it frequently, so that data is continuously been streamed to the user instead of buffering in memory.
+
+
+## Servlets' execution model
 
 Web applications are handled by Web containers using a different thread per client connection. Thus, Web containers employ a *connector pool*, also called *executor pool*. When a new request is incoming, the container looks for an available thread in the pool: if no thread is available because the pool has reached its maximum size, the request is added to a queue, waiting for an available thread (usually the queue also has a maximum size, after which the container starts rejecting connections). When a request has completed, and the response body has been sent back to the client, the thread handling that request will become free to be used by other requests. The usage of a pool is an obvious design choice to avoid having to create and destroy threads at each request, which is a very expensive operation to perform.
 
@@ -303,3 +395,5 @@ When multiple threads try to execute this code at the same time, the synchronize
 At this point, we would have two threads both writing to the id 1 of the database, meaning that instead of adding two tickets next to each other, the second ticket would override the first.
 
 Additionally, requests and responses objects obviously belong to the request being handled by the current thread. This means that sharing references to these objects to the other threads will have disastrous consequences, so never store references to the current request or response object into static or instance servlet variables.
+
+
