@@ -1,7 +1,6 @@
 # Modules and crates
 
 - [Modules](#modules)
-- [Multi-modules projects](#multi-modules-projects)
 - [Crates](#crates)
 - [Tests](#tests)
 
@@ -92,8 +91,42 @@ use game1::func2;
 
 A `mod game1` statement will look for either a file named `game1.rs` in the current directory, or a file named `mod.rs` inside a `game1` directory.
 
+Beware that you need to import a module not only when you want to use a data structure or trait defined in it, but also when another module that you already imported is using a method defined in it. For example, this is the typical situation that happens when using traits:
+```
+src/
+    main.rs
+    service/
+        mod.rs
+        service.rs
+        service_interface.rs
+```
 
-## Multi-modules projects
+where `service_interface.rs` defines the `ServiceInterface` trait with the `getValue()` method, and `service.rs` defines the `Service` struct, implementing `ServiceInterface`. Inside `main.rs`, if we do:
+```rust
+// main.rs
+mod service;
+
+use service::service::Service;
+
+fn main() {
+    let service = Service::new(2);
+    println!("{}", service.getValue());
+}
+```
+
+because we think that, after all, we are only using `Service` here, and not `ServiceInterface`, we would have a compiler error telling us that the `getValue()` method is undefined, and the reason for this is that the `getValue()` method isn't actually defined inside `Service`, but rather inside `ServiceInterface`, and as such to be able to use it we need to import also `ServiceInterface`:
+```rust
+// main.rs
+mod service;
+
+use service::service::Service;
+use service::service_interface::ServiceInterface;
+
+// ...
+```
+
+
+### Multi-modules projects
 
 When a project is composed of multiple modules in multiple files, it's not enough to define them to allow them to be used:
 ```rust
@@ -189,19 +222,62 @@ Additionally, since at this location `dep1` is also the current module, we can r
 use self::dep2::some_fun2;
 ```
 
-Let's say we had an additional module, `dep3`, still sub-module of `dep1` (thus at the same level of `dep2`), and that `dep2` depended on `dep3`. In this case, `dep2` would've need to reference `dep3` with a `use` statement: since we are inside a sub-module, we need to write the fully qualified name of `dep3` from within `dep2` code:
+Let's say we had an additional module, `dep3`, still sub-module of `dep1` (thus at the same level of `dep2`), and that `dep2` depended on `dep3`. In this case, `dep2` would've needed to reference `dep3` with a `use` statement: since we are inside a sub-module, we need to write the fully qualified name of `dep3` from within `dep2` code:
 ```rust
 // dep1/dep2.rs
 use dep1::dep3::some_fun3;
 ```
 
-Not unlike the previous case, here we can also simplified this code as:
+Not unlike the previous case, here we can also simplify this code as:
 ```rust
 // dep1/dep2.rs
 use super::dep3::some_fun3;
 ```
 
 where `super` is a shorthand for the parent module, and the parent of `dep2` is of course `dep1`.
+
+
+### Same module with multiple files
+
+In Rust it's not possible to define a single module with more than one file, because every different file is regarded as a different module in itself. However, we can achieve the same result exposing sub modules.
+
+Let's say we have a `service` module containing `ServiceInterface` and `Service`: of course we could define the trait and the struct in the same `service.rs` file, but we want to stick to the rule of having only one definition per file:
+```
+src/
+    lib.rs
+    service/
+        mod.rs
+        service.rs
+        service_interface.rs
+```
+
+and we want to be able to reference those elements like:
+```rust
+// lib.rs
+mod service;
+
+use service::Service;
+use service::ServiceInterface;
+```
+
+So, the first thing we'd think of doing would probably be something like:
+```rust
+// service/mod.rs
+mod service;
+mod service_interface;
+```
+
+This, however, is wrong, because `Service` can be actually found as `service::service::Service`, and `ServiceInterface` as `service::service_interface::Service`. What we actually need to do, is to expose these two elements directly from the `service` module, using a public import:
+```rust
+// service/mod.rs
+mod service;
+mod service_interface;
+
+pub use service::Service;
+pub use service_interface::ServiceInterface;
+```
+
+this way, from the point of view of the external code, it'd be exactly as if `Service` and `ServiceInterface` were defined directly within `service`, as if the service module was fully contained inside a single `service.rs` file.
 
 
 ## Crates
