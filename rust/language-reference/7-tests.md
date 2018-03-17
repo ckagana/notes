@@ -139,34 +139,29 @@ Also, it's important to notice that it's necessary for the project to have a `li
 ## Documentation tests
 
 These tests can be a quick way to embed documentation *and* unit tests at the same time.
-These tests have a special `//!` comment placed at the module level and can be run with `cargo tests`.
-You can then run `cargo doc --no-deps` and build the documentation too.
+These tests have a special `//!` comment placed at the module level and can be run with `cargo test`.
+You can then run `cargo doc --no-deps` and build the documentation too:
 
 ```
 //! This is a documentation test
 //!
-//! ```                                                               .
 /*! <-- begin a multiline comment
-    to demonstrate the syntax
+        to demonstrate the syntax
         and the proper tags needed
 */
 //!
-//! # Example of how my module works
-//!
+//! ## Example of how my module works
+//! ```                                                               .
+//! use my_crate::sum;
 //! let a = 5;
 //! let b = 6;
-//!
-//! assert_eq!(11, sum(a + b));
+//! assert_eq!(11, sum(a, b));
 //! ```                                                               .
 
 fn sum(a: i32, b: i32) -> i32 {
     a + b
 }
 ```
-
-//! This is the documentation for `flaker`
-//!
-//! # Examples
 
 ## Test doubles
 @todo
