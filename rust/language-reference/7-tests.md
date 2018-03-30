@@ -2,6 +2,7 @@
 
 - [Unit tests](#unit-tests)
 - [Integration tests](#integration-tests)
+- [Documentation tests](#documentation-tests)
 - [Test doubles](#test-doubles)
 
 In Rust tests are functions decorated with the `#[test]` annotation, which are run when launching `cargo test` from the command line. As usual, we may want to separate unit tests from integration tests.
@@ -134,6 +135,33 @@ Since integration tests sit in a completely different crate than our project, th
 
 Also, it's important to notice that it's necessary for the project to have a `lib.rs` file (i.e. to be exposed as a library) for integration tests to work, because otherwise it would be impossible to import the project as an external crate inside the `tests` crate.
 
+
+## Documentation tests
+
+These tests can be a quick way to embed documentation *and* unit tests at the same time.
+These tests have a special `//!` comment placed at the module level and can be run with `cargo test`.
+You can then run `cargo doc --no-deps` and build the documentation too:
+
+```
+//! This is a documentation test
+//!
+/*! <-- begin a multiline comment
+        to demonstrate the syntax
+        and the proper tags needed
+*/
+//!
+//! ## Example of how my module works
+//! ```                                                               .
+//! use my_crate::sum;
+//! let a = 5;
+//! let b = 6;
+//! assert_eq!(11, sum(a, b));
+//! ```                                                               .
+
+fn sum(a: i32, b: i32) -> i32 {
+    a + b
+}
+```
 
 ## Test doubles
 @todo
