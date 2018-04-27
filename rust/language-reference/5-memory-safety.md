@@ -277,7 +277,7 @@ println!("{}", klaatu.planet); // ERROR: use of moved value 'klaatu.planet'
 
 The assignment `let kl2 = klaatu` moves the ownership on the `Alien` value from `klaatu` to `kl2`. Since the variables are mutable, we cannot allow two references to mutate the same object, because one of them could destroy it, or cause it to be reallocated to a different address, making the other a dangling pointer. Thus, once the ownership have been moved, Rust forbids us to use the previous owner in any way.
 
-Instead of moving the ownership, though, we can *borrow* it, using a mutable reference:
+Instead of moving the ownership, though, we can *borrow* it, using a reference:
 ```rust
 let kl2 = &mut klaatu;
 ```
@@ -295,3 +295,109 @@ println!("{} - {}", klaatu.planet, klaatu.n_tentacles); // prints: Pluto - 14
 ```
 
 in this example, after the `kl2` references has been destroyed at the end of the inner block, the borrowed resource is owned again by the original owner `klaatu` which is free again to use it.
+
+
+### Ownership and `self`
+
+Struct's methods can be passed the `self` parameter, representing the current invocation object. Like any other parameter, it can be passed by value, by reference, by mutable value, or by mutable reference. Let's see what happens when we pass `self` by value or by reference:
+
+```rust
+struct Test {}
+
+impl Test {
+    fn test(self) {
+        println!("Pass by value: {:p}", &self);
+    }
+
+    fn test1(&self) {
+        println!("Pass by reference: {:p}", self);
+    }
+}
+
+let test = Test{};
+println!("Local variable: {:p}", &test);    // Local variable: 0x7ffdd68320a0
+test.test1();                               // Pass by reference: 0x7ffdd68320a0
+test.test();                                // Pass by value: 0x7ffdd6832010
+```
+
+We see here that when `self` is passed by value, a copy of the invocation object is actually passed to the method! This means that in `test.test()`, `self` is not the `test` invocation object, but a copy of it, meaning that if that method was modifying the object, the invocation object wouldn't be the one being modified.
+
+When we use a reference to the invocation object, we must deal with ownership issues. For example:
+```rust
+struct Test {
+    test: String
+}
+
+impl Test {
+    fn new(test: String) -> Self {
+        Self{ test }
+    }
+
+    fn test(&self) -> String {
+        self.test // ERROR: cannot move out of borrowed content
+    }
+}
+```
+
+Here the `test()` method takes `self` by reference: this means that `self` is actually just borrowed by the body of the `test()` method, which in turn means that the invocation object is not owned by the `test()` method. Now, what this method is trying to do, is moving the `test` field to the calling client, outside of the method body itself: this, however, cannot be done, because `test()` doesn't have ownership on `self.test`.
+
+To fix this code we could do basically two things: the first is copying or cloning the `test` field, so that the new copy would be owned by the `test()` method, which can then do whatever it wishes with it. If we want to avoid wasting memory, and keep working with the original object, instead, we can return a reference to the field, instead of a value, because references don't take ownership:
+```rust
+fn test(&self) -> &String {
+    &self.test
+}
+```
+
+
+### Mutably borrowing
+
+Let's consider the following example:
+```rust
+struct Response {
+    value: String
+}
+
+impl Response {
+    fn new(value: String) -> Self {
+        Self{ value }
+    }
+
+    fn json(&mut self) -> &String {
+        &self.value
+    }
+}
+
+struct Client {
+    response: Response
+}
+
+impl Client {
+    fn new(response: Response) -> Self {
+        Self{ response }
+    }
+
+    fn request(&self) -> &Response {
+        &self.response
+    }
+}
+
+let response = Response::new("Hey, Joe".to_string());
+let client = Client::new(response);
+println!("{}", client.request().json()); // ERROR: Cannot mutably borrow immutable content
+```
+
+Here, the `Response` struct is taking `value` with a move in `new()`, thus taking ownership on it, and then borrowing it to callers in `json()`. The same way, `Client` is taking ownership on `response` in `new()`, and borrowing it in `request()`. The spin here is that now `json()` needs to mutate the invocation object, thus taking `self` as `&mut`: this makes the `Response` borrowed by `request()` unfit to be called `json()` on, since it's borrowed immutably.
+
+Since `request()` is doing a borrow, we cannot hope of changing the mutability of the `response` object; at this point the only two things we can do are either cloning the `Response` object into one we have ownership on (and that can thus be made mutable), or changing `request()` so that it knows that it has to return a mutable reference:
+```rust
+...
+impl Client {
+    ...
+    fn request(&mut self) -> &mut Response {
+        &mut self.response
+    }
+}
+...
+let mut client = Client::new(response);
+...
+```
