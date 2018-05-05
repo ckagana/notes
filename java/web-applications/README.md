@@ -12,4 +12,4 @@ Notes about developing Java Web applications.
 
 ## References
 
-Where not otherwise indicated, all material should be regarded as notes taken from studying the book "Professional Java for Web Applications" by Williams, 2014. Paragraphs signed with a "*" symbol should be intended as personal additions.
+Where not otherwise indicated, all material should be regarded as notes taken from the book "Professional Java for Web Applications" by Williams, 2014. Paragraphs marked with a "*" symbol should be intended as personal additions.
