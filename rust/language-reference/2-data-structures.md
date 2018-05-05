@@ -221,6 +221,18 @@ let smtp = &smt;
 println!("{}", smtp.name); // smtp is automatically dereferenced
 ```
 
+If variables are defined with the same names as the struct fields, the struct construction can be simplified, avoiding repeating the name of the fields:
+```rust
+struct Something {
+    name: &'static str,
+    value: u32
+}
+
+let name = "Hey";
+let value: u32 = 1;
+let smt = Something{ name, value };
+```
+
 
 ## Enumerations
 

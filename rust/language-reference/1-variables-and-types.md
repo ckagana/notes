@@ -18,16 +18,16 @@ where the `const` modifier specifies the type of identifier we want to declare, 
 
 ## Constants
 
-The most common identifiers are variables and constants. Rust supports two types of constants: they're both static in lifespan, meaning that they're created at the beginning of the program, and destroyed only at the end; they both also have global accessibility; additionally, unlike variables, constants must always be declared with their type annotation.
+The most common identifiers are *variables* and *constants*. Rust supports two types of constants, which both have global accessibility, and, unlike variables, must always be declared with their type annotation.
 
 Constants defined with the `const` keyword are just inlined during compilation, meaning that all their occurrences in the code are replaced with their actual value:
 ```rust
 const PI: f32 = 3.14;
 ```
 
-The fact that they are inlined means that you can never be sure of what exact memory is being used at every occurrence of the constant, so new memory might be allocated each time a new value is used.
+The fact that they are inlined means that you can never be sure of what exact memory is being used at every occurrence of the constant, so new memory might be allocated each time the same constant is used again in the code.
 
-On the contrary, constants declared with the `static` keyword behave like global immutable variables, meaning that they are allocated once at the beginning of the program execution, and as such their values are stored in fixed memory locations, and there is always exactly one instance of each value:
+On the contrary, constants declared with the `static` keyword behave like global immutable variables, meaning that they are allocated once at the beginning of the program execution, and destroyed at its end. As such, their values are stored in fixed memory locations, and there is always exactly one instance of each value:
 ```rust
 static MAX_HEALTH: i32 = 100;
 ```
@@ -37,14 +37,12 @@ static MAX_HEALTH: i32 = 100;
 
 Variables are instead declared with the `let` keyword:
 ```rust
-fn main() {
-	let energy = 5;
-}
+let energy = 5;
 ```
 
 Unlike constants, variables can never be declared in the global scope, but only inside a block (local scope). The Rust compiler can very often infer the type of a variable from the value that's being assigned to it: as such, it's often possible to omit the type annotation from the declaration.
 
-Variables in Rust are immutable by default. Unlike other languages like JavaScript and Java, where "constant" variables are those that cannot be reassigned to different values (while the values themselves can still be modified), variables in Rust cannot be reassigned, and their values cannot be modified, meaning that the following code generates an error:
+Variables in Rust are immutable by default. Unlike other languages like JavaScript and Java, where "constant" variables are those that cannot be reassigned to different values (while the values themselves can still be modified), variables in Rust not only can't be reassigned, but also their values cannot be modified, meaning that the following code generates an error:
 ```rust
 let energy = 5;
 energy = 6; // ERROR! Re-assigning an immutable variable
@@ -102,7 +100,7 @@ here we're specifying that the value `5` is in fact an 8-bit unsigned integer. I
 
 The scope of a variable is the portion of code within which the variable exists. The scope of global constants is thus the whole program, because they exist from the beginning to the end of the program. The start of a scope is the point where a variable is declared. The end of a block (i.e. the closed curly brace `}`) always terminates a scope.
 
-Variables are allocated as soon as they are declared (that's possible because the compiler must always know the type of the variable). They are immediately destroyed as soon as they go out of scope (when the execution reaches the end of the block within which the variable has been declared).
+Variables are allocated as soon as they are declared (that's possible because the compiler always knows the type of the variable). They are immediately destroyed as soon as they go out of scope (when the execution reaches the end of the block within which the variable has been declared).
 
 Variables within an inner block can shadow variables with the same name declared in outer blocks.
 ```rust
@@ -134,19 +132,19 @@ let mut saved_points: u32 = 0;
 saved_points = points; // ERROR! Type mismatch
 ```
 
-in other programming languages a safe (read: without data loss) cast would be performed here from the narrower `i32` to the larger `u32`. In Rust, however, this is not permitted. We can still perform this cast explicitly, using the keyword `as`:
+we can still perform this cast explicitly, using the keyword `as`:
 ```rust
 saved_points = points as u32;
 ```
 
-This would also work in case of unsafe casts, thus when information is lost for instance because of decimals truncation. Not all types can be cast to others: for example it's not possible to cast a `&str` to a `i32`.
+Not all types can be cast to others: for example it's not possible to cast a `&str` to a `i32`.
 
 It's possible to create alias of existing types, much like C's `typedef`, with the `type` keyword:
 ```rust
 type MagicPower = u16;
 ```
 
-usually to give a more semantic name to existing types.
+usually to give a more meaningful name to existing types.
 
 
 ## Expressions
@@ -171,7 +169,7 @@ let n1 = {
 };
 ```
 
-here we are calculating the resulting value of the block through a series of statements. To return the result, however, we have to avoid adding the semicolon to the last line of the block. We cannot use `return` inside the block, though, because it would return from the outer function that contains that block, instead of from the block itself. The result thus returned is used as the r-value of the assignment statement.
+here we are calculating the resulting value of the block through a series of statements. To return the result, however, we have to avoid adding the semicolon to the last line of the block. We cannot use `return` inside the block, because it would return from the outer function that contains that block, instead of from the block itself. The result thus returned is used as the r-value of the assignment statement.
 
 Returning the value of an expression by means of leaving out the semicolon at the end of the line works with all blocks, including function definitions:
 ```rust
@@ -180,7 +178,7 @@ fn myFun() -> i32 {
 }
 ```
 
-Had we added the semicolon at the end of the line, the resulting value would've been consumed, and the unit value `()` would've been returned instead. This means that we must pay special attention to the usage of semicolons, to avoid getting the unit value `()` where we were expecting an actual value:
+Had we added the semicolon at the end of the line, the resulting value would've been consumed, and the unit value `()` would've been returned instead. This means that we must pay special attention to the usage of semicolons, to avoid getting the unit value `()` where we were expecting an actual value instead:
 ```rust
 let n2 = {
 	let a = 2;
@@ -196,7 +194,7 @@ In Rust conditionals are expressions as well:
 let active = if health >= 50 { true } else { false };
 ```
 
-again, we must omit the semicolon to let the two values `true` and `false` be returned by the block, and assigned to the variable. Of course, conditional constructs must return values of the same type for them to be used as expressions. We can return the value of an `if` block from a function, but we must be ware that all branches should be part of the `if`:
+again, we must omit the semicolon to let the two values `true` and `false` be returned by the block, and assigned to the variable. Of course, conditional constructs must return values of the same type for them to be used as expressions. We can return the value of an `if` block from a function, but we must be ware not to return anything outside of the `if`:
 ```rust
 fn my_fun(v: i32) -> i32 {
 	if v > 0 {
@@ -332,3 +330,14 @@ c = b;
 ```
 
 Then, following this reasoning, we could think it would be possible to also create mutable bindings to mutable references, like `let mut c:&mut i32 = &mut a`, but this doesn't actually work because it's not possible to create more than one mutable reference to the same variable.
+
+Rust provides also the `ref` keyword to create pointers, that work exactly as `&`:
+```rust
+let a:i32 = 12;
+let b:&i32 = &a;
+let ref c:i32 = a;
+println!("{:p}", b); // 0x7fffb843a80c
+println!("{:p}", c); // 0x7fffb843a80c
+```
+
+with the advantage being avoiding duplicating the `&` symbol in both the type declaration and the value assigned.
