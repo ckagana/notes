@@ -10,7 +10,7 @@ The following are notes taken while studying the book [Clean Architecture, A Cra
     - [The Dependency Inversion Principle](#the-dependency-inversion-principle)
 - [Component Principles](#component-principles)
     - [Component Cohesion](#component-cohesion)
-        - [The Reuse/Release Equivalence Principle](#the-reuse/release-equivalence-principle)
+        - [The Reuse/Release Equivalence Principle](#the-reuse-release-equivalence-principle)
         - [The Common Closure Principle](#the-common-closure-principle)
         - [The Common Reuse Principle](#the-common-reuse-principle)
     - [Tension of Components](#tension-of-components)
@@ -22,8 +22,8 @@ The following are notes taken while studying the book [Clean Architecture, A Cra
     - [Decoupling into layers and use cases](#decoupling-into-layers-and-use-cases)
     - [Decoupling modes](#decoupling-modes)
     - [Boundaries](#boundaries)
-    - [Screaming Architecture](#screaming-architecture)
-    - [Clean Architecture](#clean-architecture)
+    - [The Screaming Architecture](#the-screaming-architecture)
+    - [The Clean Architecture](#the-clean-architecture)
 
 ## Design Principles
 
@@ -133,7 +133,7 @@ To implement the Dependency Inversion Principle, then, we should rely on these c
 
 ### Component Cohesion
 
-#### The Reuse/Release Equivalence Principle
+#### The Reuse-Release Equivalence Principle
 
 The Reuse/Release Equivalence Principle states that to be reused, software components must be tracked through a release process. This is needed first because this way users will know if and when components are changed, and what are the possible compatibility issues.
 
@@ -276,7 +276,7 @@ Communication between services are the slowest, thus chat should be avoided wher
 Of course, in a realistic situation many different kinds of boundaries might be used: for example a service might use local processes.
 
 
-### Screaming Architecture
+### The Screaming Architecture
 
 Much like the intent of a building can be clearly guessed by just looking at its blueprints (whether it's a house, a library, etc.), thus the intent of a software system should be clearly stated by its top level modules. The architecture of a system should "scream" its intent, whether it's an accounting system, a health care system, etc. rather than what style of architecture or framework it's using (MVC, Spring, etc.).
 
@@ -287,7 +287,7 @@ In software systems, use cases play the same role as room types, so that just lo
 Furthermore, as in the buildings analogy, where the design is made so the actual construction materials can be decided later, after the design is finished and has been approved, the use cases must be completely independent from the actual frameworks and tools that will be used to implement them, so that the choice of which technology to use can be made later on, without affecting the original design.
 
 
-### Clean Architecture
+### The Clean Architecture
 
 Hexagonal architecture is only one of several architectural styles that have emerged in the latest years, among which clean architecture and onion archtecture, that are all trying to address the same problem: decoupling application and business code from infrastructure code.
 
