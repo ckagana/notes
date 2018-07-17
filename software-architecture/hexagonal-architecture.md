@@ -4,6 +4,8 @@
 - [The layout of hexagonal architecture](#the-layout-of-hexagonal-architecture)
 - [Ports and adapters](#ports-and-adapters)
 - [References](#references)
+- [Example](#example)
+- [Resources](#resources)
 
 The intent of hexagonal architecture is to "allow an application to equally be driven by users, programs, automated tests or batch scripts, and to be developed and tested in isolation from its eventual run-time devices and databases". Hexagonal architecture can be regarded as an attempt to improve on the classic layered architecture.
 
@@ -23,61 +25,53 @@ A better solution, instead, would be to recognize that these services belong to 
 
 Hexagonal architecture, in contrast with layered architecture, particularly stresses the difference between the "inside" and the "outside" of an application. The inside of the application contains what layered architecture calls the application layer and the domain layer, which include all domain related objects (domain layer) plus all business services that define what can be done with the domain objects, e.g. use cases and business logic (application layer).
 
-The outside of the application, also called the framework layer, contains all supporting services that are not directly related to the domain, nor to the application, like user interface, database access, communication, etc. This way use business entities can be completely independent from the delivery model, which is useful both to better understand the application domain, and to test it.
+The outside of the application, also called the framework layer, contains all supporting services that are not directly related to the domain, nor to the application, like user interface, database access, communication, etc. This way business entities can be completely independent from the delivery model, which is useful both to better understand the application domain, and to test it.
 
 Applying changes to the domain layer means changing the essential meaning of the application, and thus will be done only in response to explicit client requests. Everything else, instead, is a service: it can be freely changed without modifying the purpose of the application. Example of services are database access, user interface, communication, etc. The core logic of the application should not depend on those services: this way services can be changed or replaced as easily as possible.
 
-As anticipated, the innermost layer is the domain layer, which contains domain objects, business rules, business events and use cases (domain commands), and defines the interfaces through which the outer layer can communicate with it. Of course the domain layer is completely independent from any other layer. The domain layer is what differentiates different applications of the same type, because it defines the actual behaviour and constraints of that project. The domain layer doesn't contain any application logic, though, like controller logic, nor event/command handling logic.
+As anticipated, the innermost layer is the *domain layer*, which contains domain objects, business rules, business events and use cases (domain commands), and defines the interfaces through which the outer layer can communicate with it. Of course the domain layer is completely independent from any other layer. The domain layer is what differentiates different applications of the same type, because it defines the actual behaviour and constraints of that project. The domain layer doesn't contain any application logic, though, like controller logic, nor event/command handling logic.
 
-The application layer orchestrates the use of the domain objects found in the domain layer. The application layer depends on the domain layer, and on nothing else. For example, the application layer is responsible for handling the requests coming from the framework layer, and for dispatching and handling domain events and commands.
+The *application layer* orchestrates the use of the domain objects found in the domain layer. The application layer depends on the domain layer, and on nothing else. For example, the application layer is responsible for handling the requests coming from the framework layer, and for dispatching and handling domain events and commands.
 
-The framework layer contains library and framework code that is not part of the application itself. It implements interfaces defined in the application layer, like the ones for the event dispatcher and the command bus.
+The *framework layer* contains library and framework code that is not part of the application itself. It implements interfaces defined in the application layer, like the ones for the event dispatcher and the command bus.
 
 
 ## Ports and adapters
 
-An alternative name for the hexagonal architecture is "ports and adapters", because all communication between layers is designed to happen by means of ports and adapters. Ports are interface elements exposed by the inner layers, like the domain layer, to be consumed by adapters defined in the outer layers (like the framework layer). Thus, a port is a way to accept requests into the application, or to send requests outside of it.
+As stated in the initial description of Hexagonal Architecture, the main drive for this approach is to allow different kinds of actors to use the application, such as users, programs, tests, etc., without requiring changes to most part of the application when new actors need to be supported. It turns out that fixing the problems with the Dependency Inversion Principle that bug the traditional layered application, we get to a design that can easily support multiple actors.
 
-In general, ports are the way we use abstract types to encapsulate changes: to avoid having to change the application each time a change in some requirement or technical choice is needed, we encapsulate these changes into the concrete adapters, and let the application deal only with abstract interfaces that are not subject to changes (in the worst case wrappers may be created to bridge different interfaces).
+Hexagonal Architecture is based on the premise that an application might be required to talk to different devices. In order for two devices to be able to communicate, they must understand the same *protocol*: for example, the application (which is a device in itself) may expose some kind of API, but then an HTTP browser client might not directly understand it (since it only understands raw HTTP), so some kind of adaptation needs to be put in place.
 
-*Primary ports* allow direct outside-in communication: they usually are simple methods exposed by domain objects, that are called by outer layers, for example to make changes to the domain objects themselves. Thus, *primary adapters* are objects of the outer layers that directly call primary ports.
+In the context of Hexagonal Architecture, a protocol is defined for a specific purpose of communication, and *not* for a specific device: this means that the protocol is defined on the application's side. For example, the application might be exposing an API for handling shopping carts, which can be consumed by more than one client, like a Web client to be used by human users, and an HTTP API client to be used by other machines. Here we have only one protocol in place, which is the one defining what can be done with shopping carts, defined in the application, and all devices that want to use it, must adhere to it: it's not the case that there is a different protocol for each different device (Web and API in this case).
 
-*Secondary ports* allow indirect, inside-out communication: they are usually defined as interfaces in the domain layer. The *secondary adapters*, in this case, are implementations of those interfaces, defined in the outer layers, and injected into the domain objects. This way, domain objects can use services belonging to the outside layers (like storage services), without being coupled to them.
+In Hexagonal Architecture, the part of the application that defines a specific protocol is called a *port*: in our previous example, then, our application will have a Shopping Cart port. Of course multiple ports might be defined, because there might be multiple purposes of communication: for example there could be an Administration port as well.
 
-For example, the application can have a Storage port (interface), and the surrounding framework will provide adapters that fit that specific port. It's important to notice that the application doesn't know about the existence of the framework: it just requires an object implementing the Storage adapter interface: this would be the "port". The framework, when bootstrapping the application, will inject a concrete Storage adapter (the actual "adapter") into the components requiring it. This separation will allow us to freely swap the concrete adapter, and thus the Storage technology we want to use (from MySQL to SQL Server for example).
+Communication purposes are usually identified as *actors*, which would be the fictitious entities using the system to carry out a specific purpose. For example, in an e-commerce application the Customer could be the actor with the purpose of buying goods: this communication purpose will be supported by the Shopping Cart port. Thus, in the design phase we first identify the actors of the system, and to each of them we can then associate a specific port.
 
-Adapters implemented at the outmost level represent both components of the classic presentation layer, and components of the classic infrastructure layer, because these layers have now been crammed into the same space. In addition to them, the framework layer will contain also other kinds of adapters, for example unit tests. Since it's important that adapters having different intents don't talk directly to each other (because they would by-pass important business logic), it's important to introduce a segregation mechanism between them, so that each adapter is forced to talk only to the inner side, and never to other adapters. For example, a service in the presentation layer should never use a storage service.
+Being an implementation of a specific communication purpose, each port can also be seen as a way to group related use-cases together. However, these are use cases of the application itself, which are different from the use cases of the devices: in fact each device can support many additional use-cases that the application knows nothing about, or that don't precisely match the application ones. Thus, another important goal of device adapters is that of translating the device's use cases to the application's ones (which might imply to join multiple device use cases into a single application use case, or to split a single device use case into multiple application use cases), and dealing with other situations such as devices' use cases not matching any application's one, or vice-versa.
 
+As we pointed out, several different devices might be used for the same purpose of communication (port). However, each device will only understand its own protocol, which will likely be different from the one implemented by the port it's trying to talk to. This means that we need to put an *adapter* between the device and the port, to translate the device protocol to the port's one. Thus, every port will have a specific adapter attached to it, for every device that wants to communicate with it.
 
-## Clean architecture
+A *primary port* has the purpose of letting users communicate with the application, while a *secondary port* is used to let the application communicate to external devices (for example a database). Most applications actually only have a primary port, supporting the main features of the application, and a secondary port, to talk to a database. Likewise, a *primary adapter* will be attached to a primary port, and could be a system-level test suite, a GUI, another application (remote or local), etc., while a *secondary adapter* will be attached to a secondary port, and could be a database, a system to send notifications, etc. In particular, when it comes to tests, if the primary adapter is a system-level test suite, the correspondent secondary adapters will be mock objects.
 
-Hexagonal architecture is only one of several architectural styles that have emerged in the latest years, among which clean architecture and onion archtecture, that are all trying to address the same problem: decoupling application and business code from infrastructure code.
-
-All these kinds of architecture, also, suggest to respect the dependency inversion principle, meaning that the dependencies relations should only go from the outside in: outer components are more concrete than, and depend on, the inner ones, which on the other hand are more abstract and independent.
-
-At the innermost layer, are located *entities*, which encapsulate enterprise business rules, which are the most generic and high level of the entire application, and the least likely to change. They have no knowledge of application navigation, security or operations, for example.
-
-Surrounding the entity layer we found *use cases*, containing application specific business rules. These are all the use cases of the system, necessary to orchestrate the flow of data to and from entities, so that entities can use their enterprise business rules to achieve the goals of the use cases. Since entities are independent from use cases, changes in use cases don't affect entities. Also, use cases are independent from external concerns, like routing and databases.
-
-The next layer, just outside the use cases layer, contains adapters used to convert data from the format used by the infrastructure (the Web, databases, etc.) to the format required by use cases and entities. This, for example, is the layer where all MVC components will be implemented. No code inward of this layer should know anything about the structural details: if some SQL is used, all of it will be located inside the adapters, and no SQL knowledge of any kind should creep into the inner layers.
-
-The outermost layer tipically contains third party components, like a framework or libraries, and implements every detail of the application: the fact that the application supports a Web adapter is just a detail, like the fact that a specific RDBMS is used, and inward layers should not be aware of any of this. Of course, these are also the elements of the application that are most likely to change.
-
-The communication between boundaries must be done solely by anemic data structures, like DTO's. The important thing is that no assumption or knowledge about external layers is ever contained in these objects. For example, if the database library wraps the data returned from a query in a row-like structure, we should never pass this object as-is to the inner layers, because this object would carry the information that a database with a concept of a row is being used, and at that point the inner layers would be tightly coupled to the application details, breaking the dependency inversion principle.
+Focusing on communication purposes (i.e. ports) instead of specific devices (i.e. adapters), allows the application to be independent from technical details, which are instead related to devices. This way the more abstract application can avoid being changed each time a device needs to be changed, which happens much more frequently.
 
 
-### Use cases and screaming architecture
+## Example
 
-Much like the intent of a building can be clearly guessed by just looking at its blueprints (whether it's a house, a library, etc.), thus the intent of a software system should be clearly stated by its top level modules. The architecture of a system should "scream" its intent, whether it's an accounting system, a health care system, etc. rather than what style of architecture or framework it's using (MVC, Spring, etc.).
+Let's finally see an example of ports and adapters for an application design according to Hexagonal Architecture. Let's consider a Weather System Application, taking weather data from different sources, and sending notifications about the weather to registered parties.
 
-The intent of a software system is described by its use cases. Going back to the buildings analogy, the intent of a building is stated by, among other things, the kind of rooms that are used (which are usually related to the "use cases" of the building, e.g. what the building will be used for), so that for example a building with a kitchen, a living room, a restroom, etc., can be safely identified as a house. In software systems, use cases play the same role as room types, so that just looking at the use cases fulfilled by the system you should be able to guess the intent of the system itself, for example that it's an accounting system. Furthermore, as in the buildings analogy, where the design is made so the actual construction materials can be decided later, after the design is finished and has been approved, the use cases must be completely independent from the actual frameworks and tools that will be used to implement them, so that the choice of which technology to use can be made later on, without affecting the original design.
+A first actor will be a Weather Source, representing the source of weather data: thus, Weather Data will be a primary port because each time new data is available, the source sends a message to the application with the new data; several different devices (and thus adapters) might act as Weather Data, for example a wire feed, an HTTP feed, and of course system test suites.
+
+Next, the application is also used by an Administrator to tweak configuration, etc., making it necessary for the application to provide an Administration primary port: adapters for it could be a GUI, an HTTP API, other applications, and tests.
+
+The application will then need to talk to Recipients of notifications about weather data: to do this it will provide a Notifications secondary port, which will interface with adapters for phone and email devices, in addition to mock objects for tests.
+
+Finally, the application will need to persist some data into a Storage, through the Storage secondary port, talking to a database adapter and mocks.
 
 
 ## Resources
-- http://www.dossier-andreas.net/software_architecture/ports_and_adapters.html
-- http://geekswithblogs.net/cyoung/archive/2014/12/20/hexagonal-architecturendashthe-great-reconciler.aspx
-- https://dzone.com/articles/hexagonal-architecture-is-powerful
+
 - http://blog.ploeh.dk/2013/12/03/layers-onions-ports-adapters-its-all-the-same/
-- http://fideloper.com/hexagonal-architecture
-- https://8thlight.com/blog/uncle-bob/2012/08/13/the-clean-architecture.html
-- https://8thlight.com/blog/uncle-bob/2011/09/30/Screaming-Architecture.html
+- http://alistair.cockburn.us/Hexagonal+architecture
+- http://geekswithblogs.net/cyoung/archive/2014/12/20/hexagonal-architecturendashthe-great-reconciler.aspx
