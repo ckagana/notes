@@ -56,6 +56,18 @@ A *primary port* has the purpose of letting users communicate with the applicati
 
 Focusing on communication purposes (i.e. ports) instead of specific devices (i.e. adapters), allows the application to be independent from technical details, which are instead related to devices. This way the more abstract application can avoid being changed each time a device needs to be changed, which happens much more frequently.
 
+Once we defined ports and adapters, with their specific use cases, we are able to also write specification (functional) tests for them. To ensure that the system works in real-life (at least with the happy flow, or other main scenarios), we write tests that exercise the specific features throughout the whole sequence of actions involved, touching all the real devices and modules that are used in a realistic scenario: these would then be integration, end-to-end tests.
+
+From the testing point of view, however, we can notice that there are two cases we might fall into, which depend on the specific way the system is designed to be deployed. Let's say we have an application with a service module providing domain models, for example Orders; this service will be consumed through an interface it defines, by one or more consumers, that for example are displaying this data to a Web page, or a REST API.
+
+This is already a situation where we have a port (the service module interface), and adapters (Web or API consumers): if we are deploying this application as a single, monolithic, bundle, containing the two adapters along with the internal service, we can write end-to-end tests that exercise the whole system, from the requests routed to the Web or API, through the internal service, to the responses returned back by the same adapters. We could call these, then, *internal ports* and *internal adapters*, where *internal* is from the perspective of the deployment strategy.
+
+However, we could also decide to deploy the module providing Orders to its own process/service, and the Web and API clients separately to their own services. In this case, the Orders service would be regarded as an independent service provider, that should be guaranteed to work properly independently of which adapter client will connect to it: for this reason, in this case we need to write end-to-end tests for the domain service alone. For the adapters also, we need to write separate end-to-end tests for both the Web and the API one. In this case, we can talk of *external ports* and *external adapters*.
+
+Of course the same application can have several internal and external ports and adapters, and they can also change from internal to external (and vice-versa) the moment a different deployment strategy is chosen. Whatever the situation is, though, it's important to notice that we are always in control of internal ports and adapters, because since we are shipping them together in the same bundle, we always know which of them we are adding to the system, and so we can make end-to-end tests taking all of them together.
+
+On the other hand, if we have external ports, we cannot control what adapters may be connected to them, because they're designed and used by different teams, or even third parties. For this reason, we cannot write end-to-end tests that include external adapters: the best thing we can do is to write tests with "transparent" adapters, that use the external port without doing any protocol translation, and verify that the port responds the way it's supposed to do. In this case, we can still consider this an integration test, in the sense that we're still testing the integration of the internal components of the system (which may of course include other internal ports and adapters).
+
 
 ## Example
 
