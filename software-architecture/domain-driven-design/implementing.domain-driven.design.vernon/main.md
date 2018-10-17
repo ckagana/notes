@@ -305,7 +305,7 @@ In the previous example, we can see how the Bookmarks concept appears in all thr
 
 ---
 
-It's helpful to think of Bounded Contexts in terms of the actual technical components that will implement them. For example, a Bounded Context will usually fit a single source code project: an entire software project composed of many different Bounded Contexts will thus contain several distinct code projects, that might well be deployed to different systems.
+It's helpful to think of Bounded Contexts in terms of the actual technical components that will implement them. For example, a Bounded Context will usually fit a single source code project: an entire software project composed of many different Bounded Contexts will thus contain several distinct code projects, that might well be deployed to different systems. Alternatively, a bounded context might be loaded into an application as a plugin, meaning additional code running in the same process, rather than a standalone service running on its own process.
 
 
 ## Chapter 4. Architecture
@@ -392,10 +392,195 @@ Event Sourcing, instead, is based on the idea of apply something similar to vers
 
 ## Chapter 5. Entities
 
-An *Entity* is a software element that models business concepts having an identity. Since an Entity has an identity, it also has an history, which is the set of changes that were applied to the software element having the same identity. The alternative to Entities are *Value Objects* which have no identity, and thus are immutable and have no history, exactly as the classic definition of what a *value* is.
+An *Entity* is a software element that models business concepts having an identity. Since an Entity has an identity, it also has an history, which is the set of changes that were applied to the software element having the same identity: this of course means that the identity of an entity must be immutable. The alternative to Entities are *Value Objects* which have no identity, and thus are immutable and have no history, exactly as the classic definition of what a *value* is.
 
-The definition of an Entity is all about its identity: this means that the only goal of the definition of a class that represents an Entity, is to define its identity and life cycle continuity. When defining a new Entity, we focus only on the primary attributes and behaviors characterizing its identity. Secondary attributes, not related to the identity, may be added only after the identity has been clearly defined.
+Thus, the main characteristics of Entities are:
+- entities can be precisely identified, and thus found during a search, among each other
+- entities can be changed, but still maintaining their identity
+
+The definition of an Entity is all about its identity: this means that the only goal of the definition of a class that represents an Entity, is to define its identity and life cycle continuity. When defining a new Entity, we focus only on the primary attributes and behaviors characterizing its identity: its intrinsic characteristics. Secondary attributes, not related to the identity, may be added only after the identity has been clearly defined.
 
 Entities that are contained in an Aggregate may have also a *local identity*, distinguishing them from the other Entities which are located in the same Aggregate. Only the Aggregate Root requires global uniqueness.
 
-The identity of an Entity may not be limited to a single value, like a UUID: if deemed practical, developers might decide to craft an unique ID containing also the date when that ID has been generated, to make it easier to reason about the values. This way, the identity would be stored in a Value Object instead of a raw string, so that also the additional information about the identity can be exposed, like in `productId.creationDate()`. Another advantage of modeling an ID with a Value Object is static analysis: if multiple different kinds of IDs are employed in the Bounded Context, it's useful that each has its own type, to avoid passing the wrong IDs to methods. The component where the identity value is generated can be for example the Aggregate Root Repository, like in `productRepository.nextIdentity()`.
+The identity of an Entity may not be limited to a single value, like a UUID: if deemed practical, developers might decide to craft an unique ID containing also the date when that ID has been generated, to make it easier to reason about the values. This way, the identity would be stored in a Value Object instead of a raw string, so that also the additional information about the identity can be exposed, like in `productId.creationDate()`. This is particularly useful when the ID itself contains meaningful information, like the type of the Entity, the creation time, etc., as in `APM-P-08-14-2012-F36AB21C`, that can be explicitly exposed by value object methods. Another advantage of modeling an ID with a Value Object is static analysis: if multiple different kinds of IDs are employed in the Bounded Context, it's useful that each has its own type, to avoid passing the wrong IDs to methods. The component where the identity value is generated can be for example the Aggregate Root Repository, like in `productRepository.nextIdentity()`.
+
+There are generally four ways to generate the identity of an entity:
+- the identity might be provided by the user of the Bounded Context: this would be the easiest situation because the Bounded Context doesn't take the responsibility of generating the identity, but since the identity needs to be unique, the user won't be able to change it in case it was inserted incorrect the first time (for example if the identity is the name of a person, the title of some content, etc.);
+- the identity might be generated by an algorithm within the Bounded Context creating the entity, for example using UUID;
+- the identity might be generated by the persistence mechanism, for example the auto-increment primary key in MySQL;
+- the identity might be provided by a different Bounded Context, for example a system that presents to the user a list of entities that s/he has to choose: the identity is managed by the other Bounded Context, and then just passed along when the user makes a choice. This has some synchronization issues because the same identities are used in two different Bounded Contexts, and thus this is the most complex solution to implement.
+
+If the identity is generated by the storage, there might be timing issues, because if some event is fired every time a new Entity is created, the new Entity won't have an identity yet, because it still hasn't been persisted in the storage, and some event handler might need to refer to its identity instead. In this situation, the new identity must be retrieved from the repository first, and then used when creating the entity.
+
+Additionally, some ORM might want to take control over identity management: this would be a problem when the identity is generated outside of the persistence mechanism, because it would be impossible to use it in the ORM. To overcome this problem, we can use a surrogate identity, meaning that the domain identity has a hidden field containing the identity used in the ORM for that entity: the surrogate identity should be always hidden, because it represents a storage concern, and it shouldn't leak into the domain. This can be done using the Layer Supertype pattern, consisting in using package-protected or class-protected method to allow the storage to set the surrogate identity from within the infrastructure layer, while at the same time no clue of the existence of the surrogate will be visible at the domain layer.
+
+If the identity is assigned to the entity after its creation, for example because it comes from the repository, it's important to enforce its immutability: if the identity is set to the entity with a setter, it needs to be modified so that the identity can be assigned only once.  
+
+Designing entities starting from data relationships, which is usually done starting from database tables and foreign keys design, leads to an Anemic Domain Model, where entities are just data holders with a lot of getters and setters, and no real behavior. Getters and setters may be used, but only when this is naturally required by the Ubiquitous Language. If the required behavior involves changing data, instead of a generic `setX()` method, it'd be better to use a `changeX()` method instead, because this makes more clear that this is a domain-required behavior, instead of just a technical way to expose the data of the Entity.
+
+For example, an Entity that has an active or inactive status might be implemented with a `setActive(boolean)` method, but this doesn't really expose the intent, and additionally it's not advisable to required multiple setters to be called to handle a request, because this will prevent a single Domain Event from being fired after a single command. If the Ubiquitous Language contains expressions like "activate" or "deactivate" the entity, then better candidates to express this behaviour would be `activate()` and `deactivate()` methods. This way the interface of the entity would reveal its intention. A query method like `isActive()` might be useful to query the current entity's status.
+
+It's useful to employ *self-encapsulation* when implementing an entity: this means that all access to entity's data, even within the same class, goes through accessors methods. This way the entity's data is abstracted, meaning that it's not true anymore that a property of an entity is the same as a field: a property might be the derived by composing several fields of the class, because a property is an abstract concept that is part of the definition of that class' purpose, while fields are just ways to store data. Additionally, self-encapsulation allows to centralize checking class' invariants my means of guards. For example:
+
+```java
+public class User extends Entity
+{
+    ...
+    
+    User(TenantId tenantId, String username, String password, Person person)
+    {
+        this();
+        this.setPassword(password);
+        this.setPerson(person);
+        this.setTenantId(tenantId);
+        this.setUsername(username);
+        this.initialize();
+    }
+    
+    ...
+    
+    void setPassword(String password)
+    {
+        if (password == null) {
+            throw new IllegalArgumentException("The password may not be set to null.");
+        }
+        this.password = password;
+    }
+    
+    void setPerson(Person person)
+    {
+        if (person == null) {
+            throw new IllegalArgumentException("The person may not be set to null.");
+        }
+    }
+    
+    ...
+}
+```
+```java
+public final class EmailAddress
+{
+    private String address;
+    
+    public EmailAddress(String address)
+    {
+        this.setAddress(address);
+    }
+    
+    ...
+    
+    private void setAddress(String address)
+    {
+        if (address == null) {
+            throw new IllegalArgumentException("The address may not be set to null.");
+        }
+        if (address.length() == 0) {
+            throw new IllegalArgumentException("The email address is required.");
+        }
+        if (address.length() > 100) {
+            throw new IllegalArgumentException("Email address must be 100 characters or less.");
+        }
+        if (!java.util.regex.Pattern.matches(
+            "\\w+([-+.']\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*",
+            address
+        )) {
+            throw new IllegalArgumentException("Email address and/or its format is invalid.");
+        }
+        
+        this.address = address;
+    }
+    
+    ...
+}
+```
+
+In the last case, which is actually a Value Object and not an Entity, the class invariants have four statements:
+- the address is not null
+- the address is not the empty string
+- the address is not more than 100 characters long
+- the address matches the specified email address format
+
+
+## Chapter 6. Value Objects
+
+Value Objects are objects that represent values, like numbers, strings, or specific concepts like a Full Name. Value Objects don't represent "things" themselves, but rather a *measure*, *quantity*, or *description* of other things. For example, a Person has an Age, and the Age is not a "thing" itself, but rather a quality or measurement of the Person "thing". Same for the Person's Name.
+
+Representing just qualities or descriptions, rather than "things", it makes sense for Value Objects to be immutable. This is usually accomplished by passing all data needed to represent the Value Object in the constructor, and then providing no way to change that data. It can happen sometimes to think that an element we are modeling as a Value Object needs to change: before turning it into an Entity, it's better to think carefully if it isn't enough to just replace the value altogether, instead of changing it, like replacing the number `10` with `15`. Additionally, usually Entities maintain references to Value Objects, not the other way around, so in the situation where it looks like a Value Object should maintain a reference to an Entity, maybe it's better to switch the direction of the reference.
+
+A Value Object may be composed of several attributes: however, all these attributes must be necessary to represent the meaning of the object as a whole, and should be almost meaningless if taken separately. For example `50,000.00 $` is a Value Object composed of two attributes: the amount `50,000` and the currency `$`; if taken separately, these two attributes are very generic and mean nothing in particular, but once they are put together, they describe a very specific monetary measure. Thus, it makes sense to create a single Value Object with two attributes, rather than two different Value Objects that should always be kept together for their usage to make sense. Before adding new attributes to an Entity, with the risk of weakening the relationships that Entity has with all other attributes, it's better to think if some of these attributes should be packed together into Value Objects with well defined concerns instead.
+
+Value Objects have no identity and no history, thus they are immutable, can be passed around to any method, and forgotten about without needing to keep track of them. Value Objects are also small, and can be created and destroyed at will, exactly as primitive values like numbers are. They can be replaced with others as soon as the measurement or description they represent changes.
+
+Value objects are easier to design, implement and test than Entities: for this reason, we should strive to base our designs more on Value Objects than Entities, and Entities themselves should be more Value Objects container than sub-Entities containers.
+
+Value Objects are often used to replace primitive or basic types like `Integer` or `String`:
+```java
+public class FullName
+{
+    private final String firstName;
+    
+    public FullName(String firstName, String lastName)
+    {
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+    
+    ...
+}
+```
+
+here it may seem wasteful to define a new class when a simple `String` could suffice. However, using a custom class has the following benefits:
+- passing around `String`s is more ambiguous than passing `FullName`s, because in the latter case we immediately know what we are dealing with
+- `FullName` abides by the Ubiquitous Language, while `String` doesn't
+- with a custom class we are reserving the ability to add invariants to this concept in the future, like making sure that the name is capitalized, while with `String` the client would need to add logic to enforce the invariant
+- `String` exposes a big interface, most of which has no meaning to the `FullName` concept, and this could be confusing
+
+Value Objects can still support methods that seemingly change their attributes, despite staying immutable. This is done with *side-effect-free functions*, returning copies of the Value Object constructed with different attributes:
+```java
+public class FullName
+{
+    ...
+    
+    public FullName withMiddleInitial(String middleInitial)
+    {
+        return new FullName(this.firstName, middleInitial, this.lastName);
+    }
+    
+    ...
+}
+```
+
+here the original `FullName` instance acts like a factory, producing a new `FullName` with a different middle initial than the original one, while the original one stays immutable. This is a useful way to encapsulate domain business logic in the same model, instead of having it leak into client code. Using a ValueObject instead of a basic type also allows to add side-effect-free functions to it when the need arises.
+
+It's often the case that a specific value type may only come in a limited set of values: for example, there are only a certain number of currencies existing in the world. In this case, we may use a specialization of Value Objects known as *Standard Types*, which basically are Value Objects only allowing a limited set of instances. They are typically implemented as enumerations:
+```java
+public enum GroupMemberType
+{
+    GROUP
+    {
+        public boolean isGroup()
+        {
+            return true;
+        }
+    },
+    USER
+    {
+        public boolean isUser()
+        {
+            return true;
+        }
+    };
+    
+    public boolean isGroup()
+    {
+        return false;
+    }
+    
+    public boolean isUser()
+    {
+        return false;
+    }
+}
+``` 
+
+Alternatively, standard Value Objects can be used as Standard Types, which would be produced by Factories or Services, maybe taking the values from a hidden database. However, in this case if the values change in the database, it won't be possible to update the already created Standard Types in the model.

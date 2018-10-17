@@ -293,11 +293,37 @@ Hexagonal architecture is only one of several architectural styles that have eme
 
 All these kinds of architecture, also, suggest to respect the dependency inversion principle, meaning that the dependencies relations should only go from the outside in: outer components are more concrete than, and depend on, the inner ones, which on the other hand are more abstract and independent.
 
+
+#### Domain layer
+
 At the innermost layer, are located *entities*, which encapsulate enterprise business rules, which are the most generic and high level of the entire application, and the least likely to change. They have no knowledge of application navigation, security or operations, for example.
+
+
+#### Application layer
 
 Surrounding the entity layer we found *use cases*, containing application specific business rules. These are all the use cases of the system, necessary to orchestrate the flow of data to and from entities, so that entities can use their enterprise business rules to achieve the goals of the use cases. Since entities are independent from use cases, changes in use cases don't affect entities. Also, use cases are independent from external concerns, like routing and databases.
 
+Use cases are implemented by *interactors*, defining how external clients can interact with the application. An interactor can be an object, like `CreateOrder`, having an `execute()` method that triggers the execution of the use case. This can very easily be seen as an implementation of the Command Pattern, and as such can be implemented in different ways with the same effect.
+
+An interactor has *input boundaries* and *output boundaries*. In particular, the interactor implements the input boundary interface, because the input will be provided using the interactor itself. On the other hand, the output boundary is defined by the interactor, but implemented by device adapters, which are typically injected in the interactor, which uses them to provide output: being injected, the interactor never knows which specific adapter is being used each time.
+
+
+#### Infrastructure layer
+
 The next layer, just outside the use cases layer, contains adapters used to convert data from the format used by the infrastructure (the Web, databases, etc.) to the format required by use cases and entities. This, for example, is the layer where all MVC components will be implemented. No code inward of this layer should know anything about the structural details: if some SQL is used, all of it will be located inside the adapters, and no SQL knowledge of any kind should creep into the inner layers.
+
+When the end user performs some action on an adapter (for example filling a form or pushing a button), this action is caught by the *controller*, which creates a *request model*, which can be either a list of arguments to a method of the input boundary, or a full-fledged DTO, which is deployed through the input interface, into the interactor.
+
+The interactor uses the data contained in the request model to perform its use case, collects the data that is possibly produced and needs to be output into a *response model* (again a DTO or a list of arguments to a method of the output boundary), and passes it back to the adapter through the output boundary.
+
+The object, belonging to the adapter, that actually implements the output boundary is called a *presenter*. The presenter, when called by the interactor, outputs a *view model*, which is another DTO containing all the information needed to perform the rendering of the response in the adapter.
+
+The *view* then takes the view model and renders the response, according to the instructions contained in the view model itself. The view has no functionality itself, besides the ability to follow the instructions of the view model, and as such doesn't usually need to be tested.
+
+When it's the application that initiates the communication instead, like when it has to use the database, the interactor uses a *gateway interface* to retrieve entities, composed with the data coming from the specific storage (secondary adapter), which is unknown by the interactor. The gateway interface is implemented by another adapter, written for the specific gateway (for example MySQL). This adapter knows all the technical details of the technology to which the application needs to talk.
+
+
+#### External layer
 
 The outermost layer typically contains third party components, like a framework or libraries, and implements every detail of the application: the fact that the application supports a Web adapter is just a detail, like the fact that a specific RDBMS is used, and inward layers should not be aware of any of this. Of course, these are also the elements of the application that are most likely to change.
 
