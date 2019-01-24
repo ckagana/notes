@@ -10,6 +10,7 @@
 - [Repositories](#repositories)
 - [Constraints, processes and specifications](#constraints-processes-and-specifications)
 
+
 ## Layered architecture
 
 Usually only a limited part of a software is related to the domain model. Many components provide functionality to help the main features mapped to the domain; such components deal for instance with database access, file access, user interfaces, etc. This distinction between main features and helper components is built upon the realization that functionality such as database access or user interface don't bear a semantic related to the domain, but instead they solve more generic problems. Following the Single Responsibility Principle, components belonging to the domain model should be kept separated from those providing more generic functionality.
@@ -28,7 +29,9 @@ This is a sample scenario involving this kind of layered architecture:
 3. The application layer calls methods provided by the domain object just retrieved to meet the user needs. Notice that domain objects aren't concerned with knowing how to deal with various usage scenarios: this is responsibility of the application layer.
 4. Once the computation done by domain objects is done, the application layer uses the infrastructure layer to persist domain objects again, that may have changed. It also notify the user of the result of the computation.
 
+
 ## Entities
+
 Certain kinds of objects have an identity, which can be defined by a specific attribute, or a combination of attributes. The identity never changes, and no two objects have the same identity (or if it happens, they should be considered as the same object); it identifies an object even through operations that remove the object from memory, like sending the object through the network, or persisting it and then terminating the application. Objects of this kind are called *entities*.
 
 The purpose of entities is specifically to maintain their identity. This means that entity objects shouldn't do more that exposing their identity, and ensuring the continuity of their life cycle. Their structure should be simple, and it should be easy to distinguish one from another, and tell if two objects are the same thing.
@@ -37,7 +40,9 @@ An important trait of entity objects is that they have a *history*, meaning that
 
 For instance, a `Customer` object may start having a `balance` of `10.00`, and then, after some operation is performed, it happens to have a `balance` of `20.00`. Although changed, this object always represented the same thing, the same customer than before, because it has an identity, and thus these different attributes it happened to have were part of his history.
 
+
 ## Value objects
+
 Entity values come with the additional costs of increased complexity due to the need of defining an identity and making so that no two objects have the same identity, and in addition to that it needs to be created a distinct instance each time a new object is needed, even if they have exactly the same attributes' values: this is because entities have a history, so if at a certain moment two entities have the same properties, they may become different later.
 
 On the other hand, a `Point` object representing a two-dimensional point in a plane, may have coordinates of `10,20`, thus referencing a specific point in the plane. Now, it doesn't make any sense to think of changing its coordinates later on, because points of a plane don't "move": the point of such an object is just to memorize a certain set of attribute values. This also means that, wherever in the application is needed a `10,20` point, the exact same object instance can be used, because what's being requested is always the same point, not a new point which now happens to have that coordinates, but which may change later on.
@@ -48,7 +53,9 @@ For instance, imagine that two clients book a flight for the same destination. T
 
 So, value objects that can be shared should always be immutable, and new value objects should be created each time a new value is needed. Value objects' attributes can be other value objects, or even references to entities, since even if the entities can change, they have an identity, and the value object is always pointing to the same entity (with the same identity).
 
+
 ## Services
+
 While many actions being performed during software execution belong to specific objects, mainly because they need knowledge incapsulated in those objects to be performed, there are often actions that aren't related to any particular type of object. These are actions that don't need access to a specific set of information to be performed, rather, they may just reference whole objects, but without needing to know details incapsulated inside them. For instance, the action of transferring money from an account to another, involves two objects: a sender and a receiver, and there's really no reason to prefer `account1.sendTo(account2)`, to `account2.receiveFrom(account1)`.
 
 These kinds of action should be located in *Service* objects. Services don't have an internal state, because they perform actions that don't need to know a specific set of information to work. To say it differently, if an action needs specific knowledge to be performed, it shouldn't belong to a service, but instead to the object that has that knowledge.
@@ -57,7 +64,9 @@ In a service, the service object is merely a device required by the fact that in
 
 Services are meant to act on domain objects, but this doesn't mean that all services should be located in the domain layer. Instead, there are usually many services that belong to the infrastructure or application layer. The important thing to consider when choosing the layer where to place a service, is not what objects it's acting on (because they are almost always domain objects), rather what's the purpose of the operation being performed by the service.
 
+
 ## Modules
+
 When a domain object initially described with a single class start growing, and being given several different responsibilities, it's natural to refactor it extracting new classes. In this situation, the original object is not being described by a single class anymore, but instead by a collection of classes tightly related to one another: this is a *Module*, and by its nature it manifests high cohesion and loose coupling, as well as classes do.
 
 Modules can be created not only extracting classes from an original class, but also grouping together related pre-existent classes. The important thing in both cases is that modules' elements are cohesive. From this perspective, two kinds of cohesion can be identified: *communicational cohesion* and *functional cohesion*.
@@ -68,7 +77,9 @@ Modules should expose only one interface. When a client needs to perform a task 
 
 A module should represent one, and only one, specific concepts. The concept represented by a module should be easy to reason about, independently of other concepts (loose coupling between modules). If understanding a module requires to continuously refer to concept belonging to other modules, it means that the two modules are strongly coupled, and they should be redesigned.
 
+
 ## Aggregates
+
 In every software model, objects are associated with one another, ending up in a complex net of relationships. For every association used in the model, there must be a way in the code to enforce it. Sometimes, associations can be enforced even in the database (for example with foreign keys).
 
 For instance, a one-to-one relationship between a customer and a bank account (a bank account *has a* customer, and a customer *has a* bank account) is enforced in the code using references (properties) between the two objects (another enforcement in the database, by means of foreign keys, may or may not be used).
@@ -92,7 +103,9 @@ If internal objects are stored in a database, only the root can be obtained thro
 
 For example, consider an aggregate meant to manage customers' data. The root entity will be `Customer`, having a `customerID` (identity) and a `name`. Then other data of the user are stored in value objects, so that they can be reused for other customers. `ContactInfo` and `Address` are two such value objects. When an outside object needs to change the address of the customer, instead of accessing the `Address` object directly, it asks the customer, and it will perform the requested operation. This is also complying to the *tell, don't ask* principle.
 
+
 ## Factories
+
 In the easiest case, when a client wants to construct an object, it will call its constructor, possibly passing some parameter to it. However, when a complex entity or aggregate needs to be constructed, the construction procedure is often very complex, involving creating multiple additional objects and setting up relationships among them. If the client had to be able to do this construction, it would need to know a lot of specific details about the internal structure of the entity or aggregate.
 
 Complex object creation must then be responsibility of a *Factory*. They encapsulate the knowledge necessary for object creation, expecially aggregates. In particular, object creation should be an atomic procedure, meaning that if one component of the object cannot be created, an exception should be raised, such that an invalid object (half built) is never returned.
@@ -109,7 +122,9 @@ These are the cases when a factory is not needed, and a constructor is enough:
 - The client needs to be aware of the specific implementation, for instance choosing the Strategy.
 - The type we want to create is exactly the class we are using, so there's no class hierarchy, and no selection of the concrete type to be done.
 
+
 ## Repositories
+
 After an object has been created, references to it need to be available to the clients that need to use that object. For instance, if the object is an entity, a reference to it may be retrieved from the root of an aggregate; or, in the case of a value object, it can be retrieved as a property of an Entity.
 
 Without any sistematic way of organizing object references, client code risks of quickly becoming littered with references, making it highly coupled to various different objects.
@@ -124,7 +139,9 @@ The important thing to highlight here, is that repositories are needed only for 
 
 Repositories can be confused with factories, because repositories are seen as creating objects as well. The important difference is that repositories reconstitute already existing objects from a storage, while factories create new ones from scratch. When a new object is to be stored, it is first created by a factory (since it's brand new), then passed to a repository to be persisted. Furthermore, factories are completely contained in the domain layer, so they have no knowledge of the infrastructure, while repositories need to interact with the persistence. Repositories and factories never directly communicate: the client asks the factory to create a new object, which is returned to the client, which then pass it to the repositories to be persisted: the repository doesn't know how the object was created.
 
+
 ## Constraints, processes and specifications
+
 A *constraint* is used to express an invariant, which is a property of an object or computation that must be always valid, no matter what happens.
 
 Let's consider a bookshelf: it has a collection of books and a capacity (maximum number of books that can be stored). The invariant here is that the size of the collection must always be less or equal than the capacity.

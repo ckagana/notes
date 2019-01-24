@@ -102,6 +102,8 @@ The object, belonging to the adapter, that actually implements the output bounda
 
 The *view* then takes the view model and renders the response, according to the instructions contained in the view model itself. The view has no functionality itself, besides the ability to follow the instructions of the view model, and as such doesn't usually need to be tested.
 
+It's important to highlight that the view must be decoupled by the view model, and that's because there can be multiple views for the same view model. A primary adapter needs to send the response to the calling device, using the requested format; to switch formats, we abstract the concept of view, meaning that a view is responsible to render the response, but each different concrete implementation of a view will do it with a different format. Unlike the usage of interfaces done in other contexts, where it's used to receive concrete implementations from different components, so that the component using the interface knows nothing of the concrete implementations, instead when it comes to views, the current component contains already several different view implementations, but the one to be used is selected according to the client request.
+
 When it's the application that initiates the communication instead, like when it has to use the database, the interactor uses a *gateway interface* to retrieve entities, composed with the data coming from the specific storage (secondary adapter), which is unknown by the interactor. The gateway interface is implemented by another adapter, written for the specific gateway (for example MySQL). This adapter knows all the technical details of the technology to which the application needs to talk.
 
 
